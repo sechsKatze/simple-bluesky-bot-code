@@ -12,7 +12,6 @@ def now_timestamp():
 
 # Bluesky 계정으로 로그인하여 JWT 토큰과 DID 값을 가져옴
 def bluesky_login(handle, app_password):
-# Bluesky 세션을 생성하고 accessJwt와 did를 반환
     print(f"[DEBUG] Bluesky 로그인 시도 - handle: {handle}")
     res = requests.post(
         "https://bsky.social/xrpc/com.atproto.server.createSession",
@@ -39,9 +38,8 @@ def create_record(jwt, repo, collection, record):
     res.raise_for_status()
     return res.json()
 
-# 이미지를 JPEG 형식으로 압축하고 1MB 이하로 용량 조정
+# 이미지를 JPEG 형식으로 압축하고 1MB 이하로 용량 조정. 해상도가 너무 클 경우 4096x4096 이내로 축소함.RGBA 또는 P 모드는 RGB로 변환하고, JPEG 품질을 점차 낮춰가며 압축
 def compress_image(image_path, max_size=1024 * 1024):
-# 이미지를 최대 max_size 이하로 압축하고 JPEG로 변환함. 해상도가 너무 클 경우 4096x4096 이내로 축소함.RGBA 또는 P 모드는 RGB로 변환하고, JPEG 품질을 점차 낮춰가며 압축
     print(f"[DEBUG] 이미지 압축 시작: {image_path}")
     with Image.open(image_path) as img:
         if img.mode in ("RGBA", "P"):
