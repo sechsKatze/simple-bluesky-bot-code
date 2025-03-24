@@ -12,7 +12,7 @@ def now_timestamp():
 
 # Bluesky 계정으로 로그인하여 JWT 토큰과 DID 값을 가져옴
 def bluesky_login(handle, app_password):
-    """Bluesky 세션을 생성하고 accessJwt와 did를 반환"""
+# Bluesky 세션을 생성하고 accessJwt와 did를 반환
     print(f"[DEBUG] Bluesky 로그인 시도 - handle: {handle}")
     res = requests.post(
         "https://bsky.social/xrpc/com.atproto.server.createSession",
@@ -41,11 +41,7 @@ def create_record(jwt, repo, collection, record):
 
 # 이미지를 JPEG 형식으로 압축하고 1MB 이하로 용량 조정
 def compress_image(image_path, max_size=1024 * 1024):
-    """
-    이미지를 최대 max_size 이하로 압축하고 JPEG로 변환함.
-    해상도가 너무 클 경우 4096x4096 이내로 축소함.
-    RGBA 또는 P 모드는 RGB로 변환하고, JPEG 품질을 점차 낮춰가며 압축
-    """
+# 이미지를 최대 max_size 이하로 압축하고 JPEG로 변환함. 해상도가 너무 클 경우 4096x4096 이내로 축소함.RGBA 또는 P 모드는 RGB로 변환하고, JPEG 품질을 점차 낮춰가며 압축
     print(f"[DEBUG] 이미지 압축 시작: {image_path}")
     with Image.open(image_path) as img:
         if img.mode in ("RGBA", "P"):
@@ -91,9 +87,6 @@ def upload_blob(jwt, image_bytes, mime_type="image/jpeg"):
 
 # quotes 폴더에서 랜덤한 .txt 파일을 선택하고 제목과 내용을 반환
 def load_random_work(quotes_dir="./quotes"):
-    """
-    quotes 폴더에서 무작위로 .txt 파일을 선택하여 제목과 텍스트 반환
-    """
     print(f"[DEBUG] 랜덤 텍스트 로드 시도 - 폴더: {quotes_dir}")
     files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")]
     if not files:
@@ -104,9 +97,6 @@ def load_random_work(quotes_dir="./quotes"):
 
 # 텍스트에서 이미지 파일명을 추출하여 텍스트/이미지 블록으로 분리
 def split_lines_with_images(text):
-    """
-    텍스트를 줄 단위로 나누고, 이미지 파일명이 포함된 줄은 이미지 블록으로 분리
-    """
     print("[DEBUG] 텍스트 내 이미지 블록 추출 시작")
     image_pattern = r'^(.*\.(jpg|jpeg|png|gif|webp))$'
     lines = text.splitlines()
