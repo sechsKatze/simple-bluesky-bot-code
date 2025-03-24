@@ -157,7 +157,7 @@ def main():
 
     blocks = split_lines_with_images(body)
 
-    handle = "wonguobot.bsky.social"
+    handle = "계정명.bsky.social"
     app_password = os.environ.get("BLUESKY_APP_PASSWORD")
     if not app_password:
         return {"status": "error", "message": "Missing app password"}
