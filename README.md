@@ -21,7 +21,7 @@
 ## Docker 사용법
  * Docker를 사용하는 이유 : AWS Lambda는 Linux x86_64용 바이너리만 허용하기 때문에 일반적인 pip 설치법인 "pip install pillow -t ." 명령어를 입력하면 .pyd(Windows용)과 .so(macOS용)를 포함해 실행할 수 없게 되어 main.py에 기재된 from PIL import Image가 인지를 못해 버그가 발생함. 따라서 Docker를 사용해 Amazon Linux용 Pillow만을 빌드해 Lambda에 맞춰 실행할 수 있음.
  * Docker Desktop을 다운로드 받아 설치 후 실행. (계정 생성은 가능한 추천함.)
- * CMD, Powershell을 열어 「docker run -v "$PWD":/var/task public.ecr.aws/sam/build-Lambda에 설정한 런타임 함수:1.115.0-x86_64 /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages/; exit"」을 입력.
+ * CMD, Powershell을 열어 「docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임에 기재한 버전:latest /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages"」을 입력.
    - 「cd 파일 경로」를 입력하면 해당 파일 경로로 이동 가능.
  * Python 폴더(파일 내부는 python/lib/Lambda에 설정한 런타임 함수/site-packages)가 생성됨. 반디집이나 zip_python_layer.py를 사용해 Python.zip로 압축.
  * 콘솔에「aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes Lambda에 설정한 런타임 함수」를 입력해 "pillow-layer"를 생성.
