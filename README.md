@@ -104,7 +104,7 @@ AWS Lambda에 이미지 라이브러리(Pillow 등)를 올리려면 AWS CLI를 �
 
 ### 4. 에러가 발생할 때 (권한 부족 등)
 - 레이어 등록 시 AccessDenied 오류가 나면 사용자에게 레이어 업로드 권한이 부족한 것!
-- AllowPublishLambdaLayer.json 파일을 참고해서 직접 인라인 정책 추가하면 해결됨
+- [AllowPublishLambdaLayer.json](https://github.com/sechsKatze/simple-bluesky-bot-code/blob/main/AllowPublishLayerVersion.json) 파일을 참고해서 직접 인라인 정책 추가하면 해결됨
 
 ### 5. 레이어 업로드 명령어
 - 이미지 처리용 라이브러리(Pillow 등)가 담긴 python.zip 파일을 Lambda에 레이어로 올리는 명령어
