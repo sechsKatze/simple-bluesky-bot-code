@@ -21,7 +21,7 @@
 
 ## 필요 사항
 - **언어**: Python  
-- **필수 모듈**:  
+- **필수 모듈**
   - `atprototools`  
   - `Pillow (PIL)`  
   → 설치:  
@@ -29,20 +29,26 @@
     pip install atprototools pillow
     ```
 
-- **폴더 구조**:  
+- **폴더 구조**
   - `quotes/` 폴더: 텍스트 및 이미지 파일 저장
+ 
+- **설치 프로그램**
+  - [Docker Desktop 다운로드 링크](https://www.docker.com/products/docker-desktop)
+  - AWS CLI (Windows용)
+   - [64비트](https://awscli.amazonaws.com/AWSCLIV2.msi)
+   - [32비트](https://awscli.amazonaws.com/AWSCLIV2-32bit.msi)
 
-- **연동 서비스**:  
+- **연동 서비스** 
   - AWS Lambda  
   - IAM (권한: `AllowPublishLayerVersion`, `AWSLambda_FullAccess`)  
   - AWS CloudWatch  
 
-- **환경변수 설정 (Lambda)**:  
+- **환경변수 설정 (Lambda)**
   - `BLUESKY_APP_PASSWORD`  
   - `BLUESKY_DID`  
   - `BLUESKY_HANDLE`
 
-- **압축용 툴**:  
+- **압축용 툴**:
   - `zip_builder.py` (반디집 사용도 가능하지만, 오류 방지를 위해 zip_builder.py 권장)
   - 'zip_python_layer.py' (Docker로 생성한 Python 폴더를 압축하는 용도. 반디집으로도 대체 가능.)
 
@@ -57,7 +63,7 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 - 그래서 Docker로 Amazon Linux 환경에서 전용 Pillow 패키지를 설치해야 함
 
 ### 2. 준비: Docker 설치
-- [Docker Desktop](https://www.docker.com/products/docker-desktop)을 설치하고 실행
+- Docker Desktop을 설치하고 실행
 - 계정 생성은 권장 (이미지 다운로드 등에서 필요할 수 있음)
 ### 3. Docker 명령어 실행
 - 터미널(cmd 또는 PowerShell)을 열고, 아래 명령어 입력
