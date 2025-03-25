@@ -19,7 +19,7 @@
  * 압축파일 생성 프로그램 : zip_builder.py (반디집으로 압축해도 상관없으나 에러가 날 확률이 있어 zip_builder.py를 추천함.)
 
 ## Docker 사용법
- * Docker를 사용하는 이유 : AWS Lambda는 Linux x86_64용 바이너리만 허용하기 때문에 일반적인 pip 설치법인 "pip install pillow -t ." 명령어를 입력하면 .pyd(Windows용)과 .so(macOS용)를 포함해 실행할 수 없게 되어 main.py가 에러날 수 있음. 따라서 Docker를 사용해 Amazon Linux용 Pillow만을 빌드해 Lambda에 맞춰 실행할 수 있음.
+ * Docker를 사용하는 이유 : AWS Lambda는 Linux x86_64용 바이너리만 허용하기 때문에 일반적인 pip 설치법인 "pip install pillow -t ." 명령어를 입력하면 .pyd(Windows용)과 .so(macOS용)를 포함해 실행할 수 없게 되어 main.py에 기재된 from PIL import Image가 인지를 못해 버그가 발생함. 따라서 Docker를 사용해 Amazon Linux용 Pillow만을 빌드해 Lambda에 맞춰 실행할 수 있음.
  * Docker Desktop을 다운로드 받아 설치 후 실행. (계정 생성은 가능한 추천함.)
  * CMD, Powershell을 열어 「docker run -v "$PWD":/var/task public.ecr.aws/sam/build-Lambda에 설정한 런타임 함수:1.115.0-x86_64 /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages/; exit"」을 입력.
    - 「cd 파일 경로」를 입력하면 해당 파일 경로로 이동 가능.
