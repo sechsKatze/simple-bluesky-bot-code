@@ -1,14 +1,14 @@
-# 해당 json은 AWS IAM의 권한 부여 시 lambda:PublishLayerVersion를 부여할 수 있는 코드입니다. 레이어 추가와 main.py에 기재된 "from PIL import Image"가 돌아가는데 중요한 함수입니다. 
-# 등록법 (▼) 
-# IAM 사용자 페이지 이동 
-# 사용자 목록에 bluesky와 연동한 계정명 클릭
-# 상단 탭의 "권한(Permissions)" → 아래로 내려서 “인라인 정책 추가(Add inline policy)” 클릭 
-# 상단 탭에서 “JSON” 선택
-# 밑의 코드를 ctrl+c & ctrl+v 
-# "다음: 검토" 클릭 
-# 정책 이름 "AllowPublishLayerVersion"으로 설정 
-# "정책 생성(Create policy)"
-# 콘솔 명령창으로 가 「aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes Lambda에 설정한 런타임」을 입력.
+_comment1 : 해당 json은 AWS IAM의 권한 부여 시 lambda:PublishLayerVersion를 부여할 수 있는 코드입니다. 레이어 추가와 main.py에 기재된 "from PIL import Image"가 돌아가는데 중요한 함수입니다. 
+_comment2 : 등록법 (▼) 
+_comment3 : IAM 사용자 페이지 이동 
+_comment4 : 사용자 목록에 bluesky와 연동한 계정명 클릭
+_comment5 : 상단 탭의 "권한(Permissions)" → 아래로 내려서 “인라인 정책 추가(Add inline policy)” 클릭 
+_comment6 : 상단 탭에서 “JSON” 선택
+_comment7 : 밑의 코드를 ctrl+c & ctrl+v 
+_comment8 : "다음: 검토" 클릭 
+_comment9 : 정책 이름 "AllowPublishLayerVersion"으로 설정 
+_comment10 : "정책 생성(Create policy)"
+_comment11 : 콘솔 명령창으로 가 「aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes Lambda에 설정한 런타임」을 입력.
 
 {
   "Version": "2012-10-17",
