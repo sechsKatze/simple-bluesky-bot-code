@@ -26,9 +26,15 @@
     ```bash
     pip install atprototools pillow
     ```
+    ```bash
+    pip install atprototools[media]
+    ```
 
-- **폴더 구조**
+- **필수 폴더와 파일**
+  - `atprototools/` 폴더: Bluesky 로그인 및 미디어 업로드 API를 다루는 라이브러리
   - `quotes/` 폴더: 텍스트 및 이미지 파일 저장
+  - `cacert.pem` 파일 : SSL 인증을 위한 루트 인증서 번들 (HTTPS 사용 시 필수)
+  - `main.py` 파일 : Lambda 진입점이자 봇의 전체 동작 로직 코드	
  
 - **설치 프로그램**
   - [Docker Desktop 다운로드 링크](https://www.docker.com/products/docker-desktop)
