@@ -8,35 +8,36 @@ import io
 
 # 현재 UTC 타임스탬프를 ISO 8601 형식으로 반환
 def now_timestamp():
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z") # 현재 시간을 UTC로 가져오고 마이크로초를 제거한 후 ISO 8601 형식으로 반환
 
 # Bluesky 계정으로 로그인하여 JWT 토큰과 DID 값을 가져옴
 def bluesky_login(handle, app_password):
     print(f"[DEBUG] Bluesky 로그인 시도 - handle: {handle}")
     res = requests.post(
-        "https://bsky.social/xrpc/com.atproto.server.createSession",
+        "https://bsky.social/xrpc/com.atproto.server.createSession", # Bluesky 로그인 API 호출
         json={"identifier": handle, "password": app_password},
         headers={"Content-Type": "application/json"}
     )
-    res.raise_for_status()
-    return res.json()
+    res.raise_for_status() # 오류 발생 시 예외를 발생시킴
+    return res.json() # 로그인 후 JWT와 DID 값을 포함한 응답 반환
 
 # Bluesky에 새 게시물을 생성하는 API 호출
 def create_record(jwt, repo, collection, record):
+    # JWT 토큰을 사용하여 게시물을 생성하는 API 호출
     res = requests.post(
         "https://bsky.social/xrpc/com.atproto.repo.createRecord",
         headers={
-            "Authorization": f"Bearer {jwt}",
+            "Authorization": f"Bearer {jwt}", # 인증을 위한 JWT 토큰
             "Content-Type": "application/json"
         },
         json={
-            "repo": repo,
-            "collection": collection,
-            "record": record
+            "repo": repo, # 게시물의 레포지토리
+            "collection": collection, # 게시물이 속할 컬렉션
+            "record": record # 게시물 내용
         }
     )
-    res.raise_for_status()
-    return res.json()
+    res.raise_for_status() # 오류 발생 시 예외를 발생시킴
+    return res.json() # 생성된 게시물에 대한 응답 반환
 
 # 이미지를 JPEG 형식으로 압축하고 1MB 이하로 용량 조정. 
 # 해상도가 너무 클 경우 4096x4096 이내로 축소함.
@@ -45,61 +46,61 @@ def compress_image(image_path, max_size=1024 * 1024):
     print(f"[DEBUG] 이미지 압축 시작: {image_path}")
     with Image.open(image_path) as img:
         if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
+            img = img.convert("RGB") # 이미지 모드가 RGBA 또는 P일 경우 RGB로 변환
 
         # 해상도 제한: 4096x4096
         max_dimensions = (4096, 4096)
         original_size = img.size
-        img.thumbnail(max_dimensions, Image.Resampling.LANCZOS)
+        img.thumbnail(max_dimensions, Image.Resampling.LANCZOS) # 이미지 축소
         if img.size != original_size:
             print(f"[DEBUG] 이미지 해상도 축소됨: {original_size} → {img.size}")
 
         quality = 70  # 품질을 70으로 설정하여 더 낮은 용량을 목표
-        buffer = io.BytesIO()
+        buffer = io.BytesIO() # 메모리 내 임시 버퍼
         while True:
             buffer.seek(0)
             buffer.truncate()
-            img.save(buffer, format="JPEG", quality=quality)
+            img.save(buffer, format="JPEG", quality=quality) # 이미지 저장
             print(f"[DEBUG] 이미지 용량: {buffer.tell()} bytes, 품질: {quality}")
-            if buffer.tell() <= max_size or quality < 30:
+            if buffer.tell() <= max_size or quality < 30: # 용량이 1MB 이하로 되거나 품질이 30 미만일 경우 종료
                 break
-            quality -= 5
+            quality -= 5 # 품질을 낮추어 다시 시도
 
         if buffer.tell() > max_size:
             print(f"[WARNING] 최종 이미지 용량이 여전히 {buffer.tell()} bytes로 커서 품질을 더 낮출 예정입니다.")
 
         buffer.seek(0)
-        return buffer.read(), "image/jpeg"
+        return buffer.read(), "image/jpeg" # 압축된 이미지 반환
 
 # 압축된 이미지를 Bluesky 서버에 업로드하여 blob 참조를 생성
 def upload_blob(jwt, image_bytes, mime_type="image/jpeg"):
     headers = {
-        "Authorization": f"Bearer {jwt}",
-        "Content-Type": "application/octet-stream",
+        "Authorization": f"Bearer {jwt}", # 인증을 위한 JWT 토큰
+        "Content-Type": "application/octet-stream", # 이미지 데이터 타입
     }
     res = requests.post(
-        "https://bsky.social/xrpc/com.atproto.repo.uploadBlob",
+        "https://bsky.social/xrpc/com.atproto.repo.uploadBlob", # Bluesky API 호출
         headers=headers,
-        data=image_bytes
+        data=image_bytes # 이미지 바이트 데이터 전송
     )
-    res.raise_for_status()
-    return res.json()["blob"]
+    res.raise_for_status() # 오류 발생 시 예외를 발생시킴
+    return res.json()["blob"] # 업로드된 이미지의 blob 참조 반환
 
 # quotes 폴더에서 랜덤한 .txt 파일을 선택하고 제목과 내용을 반환
 def load_random_work(quotes_dir="./quotes"):
     print(f"[DEBUG] 랜덤 텍스트 로드 시도 - 폴더: {quotes_dir}")
-    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")]
+    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")] # .txt 파일만 선택
     if not files:
-        return None, None
-    chosen_file = random.choice(files)
+        return None, None # 파일이 없으면 None 반환
+    chosen_file = random.choice(files) # 랜덤으로 파일 선택
     with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
-        return chosen_file.replace(".txt", ""), f.read()
+        return chosen_file.replace(".txt", ""), f.read() # 제목과 내용을 반환
 
 # 텍스트에서 이미지 파일명을 추출하여 텍스트/이미지 블록으로 분리
 def split_lines_with_images(text):
     print("[DEBUG] 텍스트 내 이미지 블록 추출 시작")
-    image_pattern = r'^(.*\.(jpg|jpeg|png|gif|webp))$'
-    lines = text.splitlines()
+    image_pattern = r'^(.*\.(jpg|jpeg|png|gif|webp))$' # 이미지 파일 확장자 패턴
+    lines = text.splitlines() # 텍스트를 줄 단위로 나눔
     blocks = []
     buffer = ""
     
@@ -107,15 +108,15 @@ def split_lines_with_images(text):
         line = line.strip()
         if not line:
             continue
-        if re.match(image_pattern, line, re.IGNORECASE):
+        if re.match(image_pattern, line, re.IGNORECASE): # 이미지 파일명인 경우
             if buffer.strip():
-                blocks.append({"type": "text", "content": buffer.strip()})
+                blocks.append({"type": "text", "content": buffer.strip()}) # 이전 텍스트 블록 추가
                 buffer = ""
-            blocks.append({"type": "image", "filename": line})
+            blocks.append({"type": "image", "filename": line})  # 이미지 블록 추가
         else:
-            buffer += line + "\n"
+            buffer += line + "\n" # 텍스트 블록에 추가
     if buffer.strip(): 
-        blocks.append({"type": "text", "content": buffer.strip()})
+        blocks.append({"type": "text", "content": buffer.strip()}) # 마지막 텍스트 블록 추가
     return blocks
 
 # 300자를 초과하지 않도록 텍스트를 블록 단위로 분할
@@ -124,36 +125,36 @@ def split_into_chunks(text, max_length=300):
     chunks = []
     chunk = ""
     for line in lines:
-        if len(chunk) + len(line) + 1 <= max_length:
-            chunk += line + "\n"
+        if len(chunk) + len(line) + 1 <= max_length: # 텍스트가 max_length 이하인 경우
+            chunk += line + "\n" 
         else:
-            chunks.append(chunk.strip())
-            chunk = line + "\n"
+            chunks.append(chunk.strip()) # 현재 블록을 chunks에 추가
+            chunk = line + "\n" # 새로운 블록 시작
     if chunk:
-        chunks.append(chunk.strip())
+        chunks.append(chunk.strip())  # 마지막 블록 추가
     return chunks
 
 # 메인 실행 함수 - 텍스트 로드, 이미지 업로드, 게시물 생성까지 전체 수행
 def main():
     print("[DEBUG] 메인 함수 시작")
     quotes_dir = "./quotes"
-    work_title, content = load_random_work(quotes_dir)
+    work_title, content = load_random_work(quotes_dir) # 랜덤 텍스트 로드
     if not content:
-        return {"status": "error", "message": "No content loaded"}
+        return {"status": "error", "message": "No content loaded"} # 내용이 없으면 오류 반환
 
-    parts = content.split('---')
+    parts = content.split('---') # 내용 분리 (헤드, 본문, 클로징)
     head_text = parts[0].strip() if len(parts) >= 1 else ""
     body = parts[1].strip() if len(parts) >= 2 else ""
     closing = parts[2].strip() if len(parts) == 3 else ""
 
-    blocks = split_lines_with_images(body)
+    blocks = split_lines_with_images(body) # 본문에서 이미지 블록 분리
 
     handle = "계정명.bsky.social"
-    app_password = os.environ.get("BLUESKY_APP_PASSWORD")
+    app_password = os.environ.get("BLUESKY_APP_PASSWORD") # 환경변수에서 비밀번호 가져오기
     if not app_password:
-        return {"status": "error", "message": "Missing app password"}
+        return {"status": "error", "message": "Missing app password"} # 비밀번호 없으면 오류 반환
 
-    auth = bluesky_login(handle, app_password)
+    auth = bluesky_login(handle, app_password) # Bluesky 로그인
     print("[DEBUG] 로그인 성공, DID:", auth["did"])
     jwt = auth["accessJwt"]
     did = auth["did"]
@@ -175,7 +176,7 @@ def main():
     for block in blocks:
         print(f"[DEBUG] 블록 처리: {block['type']}")
         if block["type"] == "text":
-            chunks = split_into_chunks(block["content"])
+            chunks = split_into_chunks(block["content"]) # 텍스트 블록을 작은 청크로 분할
             for chunk in chunks:
                 post = {
                     "$type": "app.bsky.feed.post",
@@ -188,18 +189,18 @@ def main():
                         "root": {"cid": root["cid"], "uri": root["uri"]},
                         "parent": {"cid": parent["cid"], "uri": parent["uri"]}
                     }
-                parent = create_record(jwt, did, "app.bsky.feed.post", post)
+                parent = create_record(jwt, did, "app.bsky.feed.post", post) # 텍스트 포스트 생성
                 prev_text = chunk
 
         elif block["type"] == "image":
-            image_path = os.path.join(quotes_dir, block["filename"])
+            image_path = os.path.join(quotes_dir, block["filename"]) # 이미지 파일 경로
             if os.path.exists(image_path):
                 try:
                     print(f"[DEBUG] 이미지 파일 존재: {image_path}")
-                    image_bytes, mime = compress_image(image_path)
+                    image_bytes, mime = compress_image(image_path) # 이미지 압축
                     print(f"[DEBUG] 이미지 압축 및 변환 완료: {block['filename']}")
 
-                    blob = upload_blob(jwt, image_bytes, mime)
+                    blob = upload_blob(jwt, image_bytes, mime) # 이미지 블롭 업로드
                     print(f"[DEBUG] 이미지 업로드 성공: {block['filename']}")
 
                     post_text = prev_text if prev_text and len(prev_text) <= 300 else f"📷 이미지: {block['filename']}"
@@ -227,7 +228,7 @@ def main():
                             "parent": {"cid": parent["cid"], "uri": parent["uri"]}
                         }
 
-                    parent = create_record(jwt, did, "app.bsky.feed.post", post)
+                    parent = create_record(jwt, did, "app.bsky.feed.post", post) # 이미지 포함 포스트 생성
                     print(f"[DEBUG] 이미지 포함 포스트 업로드 완료: {block['filename']}")
                     prev_text = None
                 except Exception as e:
@@ -246,7 +247,7 @@ def main():
                 "root": {"cid": root["cid"], "uri": root["uri"]},
                 "parent": {"cid": parent["cid"], "uri": parent["uri"]}
             }
-        parent = create_record(jwt, did, "app.bsky.feed.post", post)
+        parent = create_record(jwt, did, "app.bsky.feed.post", post) # 클로징 포스트 생성
 
     return {
         "status": "success",
@@ -256,4 +257,4 @@ def main():
 # AWS Lambda에서 진입점 역할을 하는 핸들러 함수
 def lambda_handler(event, context):
     print("[DEBUG] Lambda 핸들러 실행 시작")
-    return main()
+    return main() # 메인 함수 실행
