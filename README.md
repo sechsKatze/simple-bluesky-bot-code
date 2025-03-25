@@ -48,7 +48,11 @@
 
 - **환경변수 설정 (Lambda)**
   - `BLUESKY_APP_PASSWORD`  
-  - `BLUESKY_DID` (did 코드 확인법 : `https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=자신의 블스 계정주소`)
+  - `BLUESKY_DID` <br/>
+    did 코드 확인법 :
+    ```bash
+    https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=자신의 블스 계정주소
+    ```
   - `BLUESKY_HANDLE`
 
 - **압축용 툴**:
@@ -69,8 +73,10 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 - Docker Desktop을 설치하고 실행
 - 계정 생성은 권장 (이미지 다운로드 등에서 필요할 수 있음)
 ### 3. Docker 명령어 실행
-- 터미널(cmd 또는 PowerShell)을 열고, 아래 명령어 입력
-  - ```docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임 설정:latest /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages"```
+- 터미널(cmd 또는 PowerShell)을 열고, 아래 명령어 입력 :
+  ```bash
+  docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임 설정:latest /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages"
+  ```
 - 참고
   - "%cd%"는 현재 경로를 Docker 컨테이너에 연결하는 명령어 (Windows 전용)
   - 런타임 설정 Lambda에서 설정한 버전에 맞게 바꿔주세요 (예: python3.11,  등)
@@ -113,6 +119,12 @@ AWS Lambda에 이미지 라이브러리(Pillow 등)를 올리려면 AWS CLI를 �
 
 ### 5. 레이어 업로드 명령어
 - 이미지 처리용 라이브러리(Pillow 등)가 담긴 python.zip 파일을 Lambda에 레이어로 올리는 명령어
- - CMD : ```aws lambda publish-layer-version ^ --layer-name pillow-layer ^ --zip-file "fileb://python.zip" ^ --compatible-runtimes 설정한 런타임```
- - Powershell : ```aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes 설정한 런타임```
+ - CMD :
+   ```bash
+   aws lambda publish-layer-version ^ --layer-name pillow-layer ^ --zip-file "fileb://python.zip" ^ --compatible-runtimes 설정한 런타임
+   ```
+ - Powershell :
+   ```bash
+   aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes 설정한 런타임
+   ```
 
