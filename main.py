@@ -149,7 +149,7 @@ def main():
 
     blocks = split_lines_with_images(body) # 본문에서 이미지 블록 분리
 
-    handle = "계정명.bsky.social"
+    handle = "지정 핸들명.bsky.social"
     app_password = os.environ.get("BLUESKY_APP_PASSWORD") # 환경변수에서 비밀번호 가져오기
     if not app_password:
         return {"status": "error", "message": "Missing app password"} # 비밀번호 없으면 오류 반환
@@ -159,9 +159,9 @@ def main():
     jwt = auth["accessJwt"]
     did = auth["did"]
 
-    parent = None
-    root = None
-    prev_text = None
+    parent = None # 부모 포스트 초기화
+    root = None # 루트 포스트 초기화
+    prev_text = None # 이전 텍스트 저장 변수 초기화
 
     if head_text:
         print("[DEBUG] 서두 텍스트 존재. 첫 포스트 생성.")
@@ -171,8 +171,9 @@ def main():
             "createdAt": now_timestamp(),
             "langs": ["ko"]
         }
-        root = parent = create_record(jwt, repo=did, collection="app.bsky.feed.post", record=post)
+        root = parent = create_record(jwt, repo=did, collection="app.bsky.feed.post", record=post) # 첫 포스트 생성
 
+    # 본문 블록 처리
     for block in blocks:
         print(f"[DEBUG] 블록 처리: {block['type']}")
         if block["type"] == "text":
@@ -184,13 +185,13 @@ def main():
                     "createdAt": now_timestamp(),
                     "langs": ["ko"]
                 }
-                if parent:
+                if parent: # 부모 포스트가 있으면 reply 정보 추가
                     post["reply"] = {
                         "root": {"cid": root["cid"], "uri": root["uri"]},
                         "parent": {"cid": parent["cid"], "uri": parent["uri"]}
                     }
                 parent = create_record(jwt, did, "app.bsky.feed.post", post) # 텍스트 포스트 생성
-                prev_text = chunk
+                prev_text = chunk # 텍스트가 처리될 때 prev_text 갱신
 
         elif block["type"] == "image":
             image_path = os.path.join(quotes_dir, block["filename"]) # 이미지 파일 경로
@@ -203,17 +204,18 @@ def main():
                     blob = upload_blob(jwt, image_bytes, mime) # 이미지 블롭 업로드
                     print(f"[DEBUG] 이미지 업로드 성공: {block['filename']}")
 
-                    post_text = prev_text if prev_text and len(prev_text) <= 300 else f"📷 이미지: {block['filename']}"
+                    # 이미지가 포함된 포스트에는 이미지 파일명만 사용하거나, 텍스트가 너무 길면 간단한 설명을 추가
+                    post_text = f"📷 이미지: {block['filename']}"
 
                     image_entry = {
                         "alt": block["filename"],
                         "image": blob
                     }
 
-                    # NSFW 라벨링 제거, 서버에 맡기도록 처리
+                    # NSFW 라벨링 제거, 모더레이션 봇에게 맡기도록 처리
                     post = {
                         "$type": "app.bsky.feed.post",
-                        "text": post_text,
+                        "text": post_text,  # 이미지 설명만 포함
                         "createdAt": now_timestamp(),
                         "langs": ["ko"],
                         "embed": {
@@ -222,7 +224,7 @@ def main():
                         }
                     }
 
-                    if parent:
+                    if parent: # 부모 포스트가 있으면 reply 정보 추가
                         post["reply"] = {
                             "root": {"cid": root["cid"], "uri": root["uri"]},
                             "parent": {"cid": parent["cid"], "uri": parent["uri"]}
@@ -235,19 +237,19 @@ def main():
                     print(f"⚠️ 이미지 업로드 실패: {block['filename']} ({e})")
                     continue
 
-    if closing:
+    if closing:  # 클로징 텍스트가 있다면 추가
         post = {
             "$type": "app.bsky.feed.post",
             "text": closing,
             "createdAt": now_timestamp(),
             "langs": ["ko"]
         }
-        if parent:
+        if parent:  # 부모 포스트가 있으면 reply 정보 추가
             post["reply"] = {
                 "root": {"cid": root["cid"], "uri": root["uri"]},
                 "parent": {"cid": parent["cid"], "uri": parent["uri"]}
             }
-        parent = create_record(jwt, did, "app.bsky.feed.post", post) # 클로징 포스트 생성
+        parent = create_record(jwt, did, "app.bsky.feed.post", post)  # 클로징 포스트 생성
 
     return {
         "status": "success",
