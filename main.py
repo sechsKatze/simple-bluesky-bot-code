@@ -102,18 +102,19 @@ def split_lines_with_images(text):
     lines = text.splitlines()
     blocks = []
     buffer = ""
+    
     for line in lines:
         line = line.strip()
         if not line:
             continue
         if re.match(image_pattern, line, re.IGNORECASE):
-            if buffer:
+            if buffer.strip():
                 blocks.append({"type": "text", "content": buffer.strip()})
                 buffer = ""
             blocks.append({"type": "image", "filename": line})
         else:
             buffer += line + "\n"
-    if buffer:
+    if buffer.strip(): 
         blocks.append({"type": "text", "content": buffer.strip()})
     return blocks
 
