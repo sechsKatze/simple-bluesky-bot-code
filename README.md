@@ -75,14 +75,35 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 - zip_python_layer.py 같은 자동 압축 스크립트 사용 (코드는 적었습니다.)
 
 --- 
-## AWS CLI 사용법
- * AWS CLI가 필요한 이유 : aws lambda에 레이어를 등록하려면 AWS CLI가 필요함. 콘솔에 입력시 aws를 인식하게 해줌.
- * IAM에 들어가 AWS CLI에 사용해야 하는 AWS Access Key ID와 Secret Access Key를 발급.
- * IAM 사용자에 들어가 권한(Permissions) → 정책 추가(Add permissions) → 기존 정책 직접 연결 → 검색창에 "AWSLambdaFullAccess"를 입력 후 권한 추가.
- * 콘솔 명령창을 열어 aws configure를 입력. AWS Access Key ID와 AWS Secret Access Key, Default region name, Default output format를 입력.
- * 실패 시 : 권한 부족 때문이므로 사용자 정의 인라인 정책을 추가해야 함. (등록법은 AllowPublishLambdaLayer.json을 참고할 것.)
- * 레이어 함수 추가 명령어 :
-   - CMD : aws lambda publish-layer-version ^ --layer-name pillow-layer ^ --zip-file "fileb://python.zip" ^ --compatible-runtimes python3.12
-   - Powershell : aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes python3.12
+## AWS CLI 사용 가이드라인
+AWS Lambda에 **이미지 라이브러리(Pillow 등)**를 올리려면 AWS CLI를 사용해서 **레이어(Layer)**를 등록해야 합니다. 과정은 다음과 같습니다. 
 
+### 1. AWS CLI가 필요한 이유
+- Lambda에 **외부 라이브러리(Pillow 등)**를 추가하려면 ZIP 파일을 CLI로 업로드해야 함
+- 터미널에서 aws 명령어를 쓸 수 있게 설치 및 설정 필요
+
+### 2. IAM 사용자 만들기 & 권한 설정
+- AWS 콘솔 → IAM 서비스로 이동
+- 사용자(User) 생성 또는 기존 사용자 선택
+- AWSLambdaFullAccess 권한 추가
+  -- "권한" → "권한 추가" → "기존 정책 연결" → AWSLambdaFullAccess 검색 후 추가
+- Access Key 발급
+  -- “보안 자격 증명” 탭에서 Access Key ID, Secret Access Key 발급 (※ 메모장이던 어디던 무조건 저장할 것!)
+
+### 3. CLI 설정 (aws configure)
+- 콘솔 명령(cmd 또는 PowerShell) 열고 "aws configure"을 입력
+- 아래 순서대로 입력할 것
+  -- AWS Access Key ID
+  -- AWS Secret Access Key
+  -- Default region name → 예: ap-northeast-2 (서울)
+  -- Default output format → json를 주로 사용.
+
+### 4. 에러가 발생할 때 (권한 부족 등)
+- 레이어 등록 시 AccessDenied 오류가 나면 사용자에게 레이어 업로드 권한이 부족한 것!
+- AllowPublishLambdaLayer.json 파일을 참고해서 직접 인라인 정책 추가하면 해결됨
+
+### 5. 레이어 업로드 명령어
+이미지 처리용 라이브러리(Pillow 등)가 담긴 python.zip 파일을 Lambda에 레이어로 올리는 명령어
+- CMD : aws lambda publish-layer-version ^ --layer-name pillow-layer ^ --zip-file "fileb://python.zip" ^ --compatible-runtimes 설정한 런타임
+- Powershell : aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes 설정한 런타임
 
