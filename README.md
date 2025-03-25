@@ -24,7 +24,7 @@
  * CMD, Powershell을 열어 「docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임에 기재한 버전:latest /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages"」을 입력.
    - 「cd 파일 경로」를 입력하면 해당 파일 경로로 이동 가능.
  * Python 폴더(파일 내부는 python/lib/Lambda에 설정한 런타임 함수/site-packages)가 생성됨. 반디집이나 zip_python_layer.py를 사용해 Python.zip로 압축.
- * 콘솔에「aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes Lambda에 설정한 런타임 함수」를 입력해 "pillow-layer"를 생성.
+ * Python.zip을 레이어에 추가하는 법은 하단의 AWS CLI 사용법으로 넘어감.
 
 ## AWS CLI 사용법
  * AWS CLI가 필요한 이유 : aws lambda에 레이어를 등록하려면 AWS CLI가 필요함. 콘솔에 입력시 aws를 인식하게 해줌.
