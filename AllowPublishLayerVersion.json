@@ -1,4 +1,4 @@
-# 해당 json은 AWS IAM의 권한 부여 시 lambda:PublishLayerVersion를 부여할 수 있는 코드입니다. 레이어 추가 시 중요한 함수입니다. 
+# 해당 json은 AWS IAM의 권한 부여 시 lambda:PublishLayerVersion를 부여할 수 있는 코드입니다. 레이어 추가와 main.py에 기재된 "from PIL import Image"가 돌아가는데 중요한 함수입니다. 
 # 등록법 (▼) 
 # IAM 사용자 페이지 이동 
 # 사용자 목록에 bluesky와 연동한 계정명 클릭
