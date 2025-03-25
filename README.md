@@ -1,31 +1,80 @@
 본 프로젝트에 사용되는 코드는 CC0(Creative Commons Zero v1.0 Universal)로 배포되고 있습니다. 
 
+---
+
 # 블루스카이 봇 프로젝트
-이 프로젝트는 AWS Lambda와 연동된 파이썬 기반의 블루스카이(Bluesky) 봇을 구현하는 코드들을 정리한 것입니다. 주요 기능으로는 300자 단위의 스레드 생성, 폴더 내 이미지 자동 첨부, 이미지 크기 조정 및 압축 등이 있습니다.
+**AWS Lambda + Python 기반의 자동 포스팅 봇**  
+이 프로젝트는 블루스카이(Bluesky)에 자동으로 텍스트와 이미지를 포스팅하는 봇의 코드 모음입니다. 300자 단위 스레드 생성, 이미지 자동 첨부 및 사이즈 조정 기능을 제공합니다.
 
 ## 주요 기능
-- **스레드 생성**: 블루스카이의 포스트는 한 개당 300자로 제한되어 있습니다. 본 봇은 300자를 초과하는 내용을 자동으로 스레드 형태로 연결하여 게시합니다.
-- **이미지 자동 첨부** : quotes 폴더 내에 이미지 파일 포맷과 이미지 파일을 넣으면 텍스트 안의 이미지 파일명을 읽어 이미지 파일을 업로드하는 기능입니다. 
-- **이미지 크기 조정 및 압축** : 블루스카이는 2048px 이하, 1mg 이하의 이미지만을 허용합니다. 따라서 이미지가 너무 크거나 고용량이면 업로드에 실패할 수 있습니다. 해당 기능은 Pillow 모듈을 활용해 이미지의 크기와 용량을 자동으로 줄여 블루스카이의 규격에 맞게 업로드를 해줍니다. 
+- **스레드 생성**  
+  블루스카이의 포스트는 300자 제한이 있습니다. 이 봇의 코드는 긴 텍스트를 자동으로 분할하여 스레드 형태로 게시합니다.
+
+- **이미지 자동 첨부**  
+  `quotes` 폴더에 이미지 파일을 넣고, 텍스트 내에서 이미지 이름을 호출하면 해당 이미지를 자동으로 업로드합니다.
+
+- **이미지 크기 조정 및 압축**  
+  블루스카이는 2048px 이하 / 1MB 이하 이미지만 업로드됩니다.  
+  Pillow 모듈을 사용하여 자동으로 크기와 용량을 조절합니다.
+
+---
 
 ## 필요 사항
- * 언어 : 파이썬(Python) : 해당 프로젝트에 사용된 모든 프로그램, 코드의 언어는 파이썬으로 작성되었습니다. 
- * 파이썬 모듈 : atprototools (설치법 : 블루스카이 봇을 정리한 폴더 내에 CMD, Powershell로 "pip install atprototools"를 입력하고 엔터), PIL
- * 폴더 : quotes(봇에 구현할 텍스트와 이미지 파일을 넣는 폴더)
- * 설치 프로그램 : Docker Desktop, AWS CLI
- * 연동 서비스 : AWS Lambda, IAM, CloudWatch
-   - Lambda의 환경변수에 "BLUESKY_APP_PASSWORD", "BLUESKY_DID", "BLUESKY_HANDLE"은 추가할 것.
-   - IAM에는 AllowPublishLayerVersion와 AWSLambda_FullAccess을 추가. 
- * 압축파일 생성 프로그램 : zip_builder.py (반디집으로 압축해도 상관없으나 에러가 날 확률이 있어 zip_builder.py를 추천함.)
+- **언어**: Python  
+- **필수 모듈**:  
+  - `atprototools`  
+  - `Pillow (PIL)`  
+  → 설치:  
+    ```bash
+    pip install atprototools pillow
+    ```
 
-## Docker 사용법
- * Docker를 사용하는 이유 : AWS Lambda는 Linux x86_64용 바이너리만 허용하기 때문에 일반적인 pip 설치법인 "pip install pillow -t ." 명령어를 입력하면 .pyd(Windows용)과 .so(macOS용)를 포함해 실행할 수 없게 되어 main.py에 기재된 from PIL import Image가 인지를 못해 버그가 발생함. 따라서 Docker를 사용해 Amazon Linux용 Pillow만을 빌드해 Lambda에 맞춰 실행할 수 있음.
- * Docker Desktop을 다운로드 받아 설치 후 실행. (계정 생성은 가능한 추천함.)
- * CMD, Powershell을 열어 「docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임에 기재한 버전:latest /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages"」을 입력.
-   - 「cd 파일 경로」를 입력하면 해당 파일 경로로 이동 가능.
- * Python 폴더(파일 내부는 python/lib/Lambda에 설정한 런타임 함수/site-packages)가 생성됨. 반디집이나 zip_python_layer.py를 사용해 Python.zip로 압축.
- * Python.zip을 레이어에 추가하는 법은 하단의 AWS CLI 사용법으로 넘어감.
+- **폴더 구조**:  
+  - `quotes/` 폴더: 텍스트 및 이미지 파일 저장
 
+- **연동 서비스**:  
+  - AWS Lambda  
+  - IAM (권한: `AllowPublishLayerVersion`, `AWSLambda_FullAccess`)  
+  - AWS CloudWatch  
+
+- **환경변수 설정 (Lambda)**:  
+  - `BLUESKY_APP_PASSWORD`  
+  - `BLUESKY_DID`  
+  - `BLUESKY_HANDLE`
+
+- **압축용 툴**:  
+  - `zip_builder.py` (반디집 사용도 가능하지만, 오류 방지를 위해 zip_builder.py 권장)
+  - 'zip_python_layer.py' (Docker로 생성한 Python 폴더를 압축하는 용도. 반디집으로도 대체 가능.)
+
+--- 
+
+## Docker 사용 가이드라인
+AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(Windows/macOS)에서 pip install만 하면 작동하지 않습니다. 특히 from PIL import Image 구문이 작동하지 않는 오류가 발생할 수 있습니다. 그래서 Docker를 사용해 Amazon Linux 환경에서 Pillow를 설치해주는 과정이 필요합니다.
+
+### 1. 왜 Docker를 쓰나요?
+- 일반적인 설치(pip install pillow)는 Windows/macOS용 파일(.pyd, .so)을 포함함
+- AWS Lambda는 Amazon Linux x86_64용 바이너리만 지원
+- 그래서 Docker로 Amazon Linux 환경에서 전용 Pillow 패키지를 설치해야 함
+
+### 2. 준비: Docker 설치
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)을 설치하고 실행
+- 계정 생성은 권장 (이미지 다운로드 등에서 필요할 수 있음)
+### 3. Docker 명령어 실행
+- 터미널(cmd 또는 PowerShell)을 열고, 아래 명령어 입력
+  -- docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임 설정:latest /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages"
+- 참고
+  -- "%cd%"는 현재 경로를 Docker 컨테이너에 연결하는 명령어 (Windows 전용)
+  -- 런타임 설정 Lambda에서 설정한 버전에 맞게 바꿔주세요 (예: python3.11,  등)
+
+### 4. 폴더 구조 확인
+- 명령어 실행 후, 프로젝트 폴더 안에 다음과 같은 구조가 생성됩니다
+- python/lib/Lambda에 설정한 런타임 함수/site-packages
+
+### 5. 압축하기 (Python.zip 만들기)
+- 반디집, 7-Zip 등 압축 프로그램 사용
+- zip_python_layer.py 같은 자동 압축 스크립트 사용 (코드는 적었습니다.)
+
+--- 
 ## AWS CLI 사용법
  * AWS CLI가 필요한 이유 : aws lambda에 레이어를 등록하려면 AWS CLI가 필요함. 콘솔에 입력시 aws를 인식하게 해줌.
  * IAM에 들어가 AWS CLI에 사용해야 하는 AWS Access Key ID와 Secret Access Key를 발급.
