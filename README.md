@@ -11,7 +11,7 @@
 ## 필요 사항
  * 파이썬 모듈 : atprototools (설치법 : 블루스카이 봇을 정리한 폴더 내에 CMD, Powershell로 "pip install atprototools"를 입력하고 엔터), PIL
  * 폴더 : quotes(봇에 구현할 텍스트와 이미지 파일을 넣는 폴더)
- * 프로그램 : Docker Desktop (AWS Lambda는 Linux x86_64용 바이너리만 허용하기 때문에 Window의 PIL과 연동되지 않음.즉 Docker로 빌드해서 연동해야 함.)
+ * 설치 프로그램 : Docker Desktop, AWS CLI
  * 연동 서비스 : AWS Lambda, IAM, CloudWatch
    - Lambda의 환경변수에 "BLUESKY_APP_PASSWORD", "BLUESKY_DID", "BLUESKY_HANDLE"은 추가할 것.
    - IAM에는 AllowPublishLayerVersion와 AWSLambda_FullAccess을 추가. 
@@ -24,5 +24,11 @@
    - 「cd 파일 경로」를 입력하면 해당 파일 경로로 이동 가능.
  * Python 폴더(파일 내부는 python/lib/python3.12/site-packages)가 생성됨. 반디집이나 zip_python_layer.py를 사용해 Python.zip로 압축.
  * 콘솔에「aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes python3.12(Lambda에 설정한 런타임에 맞춰야 함!)」를 입력해 "pillow-layer"를 생성.
+
+## AWS CLI 사용법
+ * AWS CLI가 필요한 이유 : aws lambda에 레이어를 등록하려면 AWS CLI가 필요함. 콘솔에 입력시 aws를 인식하게 해줌. 
+ * 레이어 함수 추가 명령어 :
+   - CMD : aws lambda publish-layer-version ^ --layer-name pillow-layer ^ --zip-file "fileb://python.zip" ^ --compatible-runtimes python3.12
+   - Powershell : aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes python3.12
 
 
