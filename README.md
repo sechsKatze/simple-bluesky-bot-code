@@ -22,7 +22,7 @@
  * Docker Desktop을 다운로드 받아 설치 후 실행. (계정 생성은 가능한 추천함.)
  * CMD, Powershell을 열어 「docker run -v "$PWD":/var/task public.ecr.aws/sam/build-python3.12:1.115.0-x86_64 /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages/; exit"」을 입력.
    - 「cd 파일 경로」를 입력하면 해당 파일 경로로 이동 가능.
- * Python 폴더가 생성됨. 반디집이나 zip_python_layer.py를 사용해 Python.zip로 압축.
+ * Python 폴더(파일 내부는 python/lib/python3.12/site-packages)가 생성됨. 반디집이나 zip_python_layer.py를 사용해 Python.zip로 압축.
  * 콘솔에「aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes python3.12(Lambda에 설정한 런타임에 맞춰야 함!)」를 입력해 "pillow-layer"를 생성.
 
 
