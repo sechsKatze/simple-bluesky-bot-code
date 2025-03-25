@@ -39,9 +39,7 @@
  
 - **설치 프로그램**
   - [Docker Desktop 다운로드 링크](https://www.docker.com/products/docker-desktop)
-  - AWS CLI (Windows용)
-   - [64비트](https://awscli.amazonaws.com/AWSCLIV2.msi)
-   - [32비트](https://awscli.amazonaws.com/AWSCLIV2-32bit.msi)
+  - AWS CLI (Windows용) - [64비트](https://awscli.amazonaws.com/AWSCLIV2.msi) / [32비트](https://awscli.amazonaws.com/AWSCLIV2-32bit.msi)
 
 - **연동 서비스** 
   - AWS Lambda
