@@ -48,7 +48,7 @@
 
 - **환경변수 설정 (Lambda)**
   - `BLUESKY_APP_PASSWORD`  
-  - `BLUESKY_DID`  
+  - `BLUESKY_DID` (did 코드 확인법 : https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=자신의 블스 계정주소)
   - `BLUESKY_HANDLE`
 
 - **압축용 툴**:
