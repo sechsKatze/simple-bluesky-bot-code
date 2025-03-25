@@ -1,4 +1,4 @@
-본 프로젝트에 사용되는 코드는 CC0(Creative Commons Zero v1.0 Universal)로 배포되고 있습니다. 
+본 프로젝트에 사용되는 코드는 CC0(Creative Commons Zero v1.0 Universal)로 배포되고 있습니다.<br/>
 블루스카이 봇을 만드는데 도움이 된 블로그 포스트 - [링크](https://udaqueness.blog/2023/07/23/%ED%8C%8C%EC%9D%B4%EC%8D%AC%EC%9C%BC%EB%A1%9C-%EB%B8%94%EB%A3%A8%EC%8A%A4%EC%B9%B4%EC%9D%B4-%EB%B4%87-%EB%A7%8C%EB%93%A4%EA%B8%B0/)
 
 
@@ -21,7 +21,7 @@
 ## 필요 사항
 - **언어**: Python  
 - **필수 모듈**
-  - `atprototools`  
+  - `atprototools` & `atprototools media`
   - `Pillow (PIL)`  
   → 설치:  
     ```bash
