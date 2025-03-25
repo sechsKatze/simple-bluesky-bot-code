@@ -1,9 +1,15 @@
-#해당 코드는 수동으로 일일히 .zip로 압축하기 귀찮아하는 분을 위해 구현화한 코드입니다. AWS Lambda에서 필요한 폴더, 파일만 압축해줍니다. 
+#해당 코드는 수동으로 일일히 .zip로 압축하거나 삭제하기 귀찮아하는 분을 위해 구현화한 코드입니다. AWS Lambda에서 필요한 폴더, 파일만 압축해줍니다. 
 #압축 시 제외할 키워드와 확장자, 특정 파일은 예제입니다. 해당 코드에 기재된 키워드들은 제 PC에 맞추어져있기에 사용자 분의 PC 환경에 맞춰주세요.
 # 사용법 : CMD(명령 프롬프트)나 Powersell을 열고 Python zip_builder.py나 py zip_builder.py를 입력하시고 엔터를 누르면 됩니다. 
 
 import zipfile
 import os
+
+# 기존 deployment.zip 삭제
+ZIP_FILENAME = "deployment.zip"
+if os.path.exists(ZIP_FILENAME):
+    os.remove(ZIP_FILENAME)
+    print(f"🗑️ 기존 {ZIP_FILENAME} 삭제 완료")
 
 # 제외할 키워드 (폴더/경로에 포함되면 무조건 제외)
 EXCLUDE_KEYWORDS = {
@@ -50,3 +56,4 @@ def zip_dir_utf8(folder_path, zip_path):
 
 zip_dir_utf8(".", "deployment.zip")
 print("✅ deployment.zip 생성 완료 (UTF-8 인코딩, 필요한 파일만 포함됨)")
+
