@@ -31,6 +31,7 @@
  * IAM에 들어가 AWS CLI에 사용해야 하는 AWS Access Key ID와 Secret Access Key를 발급.
  * IAM 사용자에 들어가 권한(Permissions) → 정책 추가(Add permissions) → 기존 정책 직접 연결 → 검색창에 "AWSLambdaFullAccess"를 입력 후 권한 추가.
  * 콘솔 명령창을 열어 aws configure를 입력. AWS Access Key ID와 AWS Secret Access Key, Default region name, Default output format를 입력.
+ * 실패 시 : 권한 부족 때문이므로 사용자 정의 인라인 정책을 추가해야 함. (등록법은 AllowPublishLambdaLayer.json을 참고할 것.)
  * 레이어 함수 추가 명령어 :
    - CMD : aws lambda publish-layer-version ^ --layer-name pillow-layer ^ --zip-file "fileb://python.zip" ^ --compatible-runtimes python3.12
    - Powershell : aws lambda publish-layer-version --layer-name pillow-layer --zip-file "fileb://python.zip" --compatible-runtimes python3.12
