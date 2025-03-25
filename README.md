@@ -81,7 +81,7 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 
 ### 5. 압축하기 (Python.zip 만들기)
 - 반디집, 7-Zip 등 압축 프로그램 사용
-- [zip_python_layer.py](https://github.com/sechsKatze/simple-bluesky-bot-code/blob/main/zip_python_layer.py) 같은 자동 압축 스크립트 사용 (코드는 적었습니다.)
+- [zip_python_layer.py](https://github.com/sechsKatze/simple-bluesky-bot-code/blob/main/zip_python_layer.py) 같은 자동 압축 스크립트 사용.
 
 
 ## AWS CLI 사용 가이드라인
@@ -97,7 +97,7 @@ AWS Lambda에 이미지 라이브러리(Pillow 등)를 올리려면 AWS CLI를 �
 - AWSLambdaFullAccess 권한 추가
   - "권한" → "권한 추가" → "기존 정책 연결" → AWSLambdaFullAccess 검색 후 추가
 - Access Key 발급
-  - “보안 자격 증명” 탭에서 Access Key ID, Secret Access Key 발급 (※ 메모장이던 어디던 무조건 저장할 것!)
+  - “보안 자격 증명” 탭에서 Access Key ID, Secret Access Key 발급 (※ 메모장이던 어디던 무조건 메모 후 저장할 것!)
 
 ### 3. CLI 설정 (aws configure)
 - 콘솔 명령(cmd 또는 PowerShell) 열고 "aws configure"을 입력
