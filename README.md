@@ -1,6 +1,5 @@
 본 프로젝트에 사용되는 코드는 CC0(Creative Commons Zero v1.0 Universal)로 배포되고 있습니다. 
 
----
 
 # 블루스카이 봇 프로젝트
 **AWS Lambda + Python 기반의 자동 포스팅 봇**  
@@ -17,7 +16,7 @@
   블루스카이는 2048px 이하 / 1MB 이하 이미지만 업로드됩니다.  
   Pillow 모듈을 사용하여 자동으로 크기와 용량을 조절합니다.
 
----
+
 
 ## 필요 사항
 - **언어**: Python  
@@ -52,7 +51,7 @@
   - `zip_builder.py` (반디집 사용도 가능하지만, 오류 방지를 위해 zip_builder.py 권장)
   - 'zip_python_layer.py' (Docker로 생성한 Python 폴더를 압축하는 용도. 반디집으로도 대체 가능.)
 
---- 
+
 
 ## Docker 사용 가이드라인
 AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(Windows/macOS)에서 pip install만 하면 작동하지 않습니다. 특히 from PIL import Image 구문이 작동하지 않는 오류가 발생할 수 있습니다. 그래서 Docker를 사용해 Amazon Linux 환경에서 Pillow를 설치해주는 과정이 필요합니다.
@@ -80,7 +79,7 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 - 반디집, 7-Zip 등 압축 프로그램 사용
 - zip_python_layer.py 같은 자동 압축 스크립트 사용 (코드는 적었습니다.)
 
---- 
+
 ## AWS CLI 사용 가이드라인
 AWS Lambda에 **이미지 라이브러리(Pillow 등)**를 올리려면 AWS CLI를 사용해서 **레이어(Layer)**를 등록해야 합니다. 과정은 다음과 같습니다. 
 
