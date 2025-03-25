@@ -38,7 +38,7 @@
    - [32비트](https://awscli.amazonaws.com/AWSCLIV2-32bit.msi)
 
 - **연동 서비스** 
-  - AWS Lambda  
+  - AWS Lambda
   - IAM (권한: `AllowPublishLayerVersion`, `AWSLambda_FullAccess`)  
   - AWS CloudWatch  
 
@@ -81,7 +81,7 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 
 
 ## AWS CLI 사용 가이드라인
-AWS Lambda에 **이미지 라이브러리(Pillow 등)**를 올리려면 AWS CLI를 사용해서 **레이어(Layer)**를 등록해야 합니다. 과정은 다음과 같습니다. 
+AWS Lambda에 이미지 라이브러리(Pillow 등)를 올리려면 AWS CLI를 사용해서 레이어(Layer)를 등록해야 합니다. 과정은 다음과 같습니다. 
 
 ### 1. AWS CLI가 필요한 이유
 - Lambda에 **외부 라이브러리(Pillow 등)**를 추가하려면 ZIP 파일을 CLI로 업로드해야 함
