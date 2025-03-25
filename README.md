@@ -10,5 +10,6 @@
  * 파이썬 모듈 : atprototools (설치법 : 블루스카이 봇을 정리한 폴더 내에 CMD, Powershell로 "pip install atprototools"를 입력하고 엔터)
  * 폴더 : quotes(봇에 구현할 텍스트와 이미지 파일을 넣는 폴더)
  * 연동 서비스 : AWS Lambda, IAM, CloudWatch
+ * 압축파일 생성 프로그램 : zip_builder.py (반디집으로 압축해도 상관없으나 에러가 날 확률이 있어 zip_builder.py를 추천함.)
 
 
