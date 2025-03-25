@@ -54,7 +54,7 @@
 
 - **압축용 툴**:
   - `zip_builder.py` (반디집 사용도 가능하지만, 오류 방지를 위해 zip_builder.py 권장)
-  - 'zip_python_layer.py' (Docker로 생성한 Python 폴더를 압축하는 용도. 반디집으로도 대체 가능.)
+  - `zip_python_layer.py` (Docker로 생성한 Python 폴더를 압축하는 용도. 반디집으로도 대체 가능.)
 
 
 
