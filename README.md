@@ -76,7 +76,7 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 
 ### 5. 압축하기 (Python.zip 만들기)
 - 반디집, 7-Zip 등 압축 프로그램 사용
-- zip_python_layer.py 같은 자동 압축 스크립트 사용 (코드는 적었습니다.)
+- [zip_python_layer.py](https://github.com/sechsKatze/simple-bluesky-bot-code/blob/main/zip_python_layer.py) 같은 자동 압축 스크립트 사용 (코드는 적었습니다.)
 
 
 ## AWS CLI 사용 가이드라인
