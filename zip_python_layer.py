@@ -1,5 +1,5 @@
 # Docker를 사용하여 Lambda 호환 환경에서 PIL(Pillow) 설치 시 파일을 압축해야 하는데 Window에는 압축 명령어인 "zip -r python.zip python"를 사용할 수 없습니다. 
-# 따라서 해당 코드는 AWS Lambda에 연동할 Docker로 생성한 python 폴더를 "python.zip" 으로 압축해주는 코드입니다. 
+# 따라서 해당 코드는 AWS Lambda에 연동할 Docker로 생성한 python 폴더를 "python.zip" 으로 압축해주는 코드입니다. (반디집을 사용해도 상관없음. python 폴더를 우클릭해 반디집으로 압축하기를 누르면 됨.)
 # 사용법은 CMD(명령 프롬프트)나 Powershell을 열고 "Python zip_python_layer.py" 나 "py zip_python_layer.py" 을 입력하고 엔터.
 
 import zipfile
