@@ -75,11 +75,11 @@ AWS Lambda에서는 Linux 전용 바이너리만 허용되기 때문에, 로컬(
 ### 3. Docker 명령어 실행
 - 터미널(cmd 또는 PowerShell)을 열고, 아래 명령어 입력 :
   ```bash
-  docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임 설정:latest /bin/sh -c "pip install pillow -t python/lib/python3.12/site-packages"
+  docker run -v "%cd%:/var/task" public.ecr.aws/sam/build-런타임 설정:latest /bin/sh -c "pip install pillow -t python/lib/런타임 설정/site-packages"
   ```
 - 참고
   - "%cd%"는 현재 경로를 Docker 컨테이너에 연결하는 명령어 (Windows 전용)
-  - 런타임 설정 Lambda에서 설정한 버전에 맞게 바꿔주세요 (예: python3.11,  등)
+  - 런타임 설정 : Lambda에서 설정한 버전에 맞게 바꿔주세요 (예: python3.11 등)
 
 ### 4. 폴더 구조 확인
 - 명령어 실행 후, 프로젝트 폴더 안에 다음과 같은 구조가 생성됩니다
