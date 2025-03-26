@@ -107,21 +107,22 @@ def split_lines_with_images(text):
     print("[DEBUG] 텍스트 내 이미지 블록 추출 시작")
     image_pattern = r'^(.*\.(jpg|jpeg|png|gif|webp))$' # 이미지 파일 확장자 패턴
     lines = text.splitlines() # 텍스트를 줄 단위로 나눔
-    blocks = []
-    buffer = ""
-    
+    blocks = [] # 최종적으로 반환할 블록 리스트
+    buffer = "" # 텍스트를 임시로 저장할 버퍼
+
+    # 각 줄을 순차적으로 처리
     for line in lines:
-        line = line.strip()
-        if not line:
+        line = line.strip() # 줄 앞뒤 공백 제거
+        if not line: # 빈 줄은 무시
             continue
         if re.match(image_pattern, line, re.IGNORECASE): # 이미지 파일명인 경우
-            if buffer.strip():
+            if buffer.strip(): # 이전에 저장된 텍스트가 있다면
                 blocks.append({"type": "text", "content": detect_and_linkify(buffer.strip())})  # 텍스트 블록을 추가 (링크 변환)
                 buffer = "" # 텍스트 블록을 추가 후 버퍼 초기화
             blocks.append({"type": "image", "filename": line})  # 이미지 블록 추가
         else:
-            buffer += line + "\n" # 텍스트 블록에 추가
-    if buffer.strip(): 
+            buffer += line + "\n" # 텍스트는 계속해서 버퍼에 저장
+    if buffer.strip(): # 텍스트가 남아 있다면 블록에 추가
         blocks.append({"type": "text", "content": detect_and_linkify(buffer.strip())})  # 텍스트 블록을 추가 (링크 변환)
     return blocks
 
