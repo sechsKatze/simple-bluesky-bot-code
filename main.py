@@ -96,6 +96,12 @@ def load_random_work(quotes_dir="./quotes"):
     with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
         return chosen_file.replace(".txt", ""), f.read() # 제목과 내용을 반환
 
+# 텍스트 내 URL을 감지하여 링크로 변환하는 함수
+def detect_and_linkify(text):
+    url_pattern = r'(https?://[^\s]+)'  # URL 정규 표현식 패턴
+    linked_text = re.sub(url_pattern, r'<a href="\1">\1</a>', text)  # URL을 HTML 링크로 변환
+    return linked_text
+
 # 텍스트에서 이미지 파일명을 추출하여 텍스트/이미지 블록으로 분리
 def split_lines_with_images(text):
     print("[DEBUG] 텍스트 내 이미지 블록 추출 시작")
@@ -110,13 +116,13 @@ def split_lines_with_images(text):
             continue
         if re.match(image_pattern, line, re.IGNORECASE): # 이미지 파일명인 경우
             if buffer.strip():
-                blocks.append({"type": "text", "content": buffer.strip()}) # 이전 텍스트 블록 추가
-                buffer = ""
+                blocks.append({"type": "text", "content": detect_and_linkify(buffer.strip())})  # 텍스트 블록을 추가 (링크 변환)
+                buffer = "" # 텍스트 블록을 추가 후 버퍼 초기화
             blocks.append({"type": "image", "filename": line})  # 이미지 블록 추가
         else:
             buffer += line + "\n" # 텍스트 블록에 추가
     if buffer.strip(): 
-        blocks.append({"type": "text", "content": buffer.strip()}) # 마지막 텍스트 블록 추가
+        blocks.append({"type": "text", "content": detect_and_linkify(buffer.strip())})  # 텍스트 블록을 추가 (링크 변환)
     return blocks
 
 # 300자를 초과하지 않도록 텍스트를 블록 단위로 분할
