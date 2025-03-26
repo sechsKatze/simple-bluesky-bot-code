@@ -135,7 +135,44 @@ def split_into_chunks(text, max_length=300):
         chunks.append(chunk.strip())  # 마지막 블록 추가
     return chunks
 
-# 메인 실행 함수 - 텍스트 로드, 이미지 업로드, 게시물 생성까지 전체 수행
+# 이 줄부터 메인 실행 함수 - 텍스트 로드, 이미지 업로드, 게시물 생성까지 전체 수행
+
+# URL을 감지하여 Bluesky API에서 하이퍼링크 미리보기(facets)를 붙일 수 있도록 구조화된 리스트로 반환
+def extract_facets(text):
+    text = re.sub(r'[\u00A0\u2000-\u200B\u202F\u205F\u3000]', ' ', text) # 다양한 종류의 유니코드 공백 문자들을 일반 공백(' ')으로 통일
+    text = text.replace('：', ':') # 전각 콜론(：)을 일반 콜론(:)으로 바꿔서 URL 인식에 방해되지 않도록 처리
+    facets = []
+    pattern = r'(https?://[^\s\)\]\}\<\>\"\']+)' # URL 패턴 정의: 괄호나 따옴표 등의 문자로 끝나지 않는 http/https 링크를 감지
+
+    # 텍스트 내에서 패턴과 일치하는 URL을 반복적으로 찾아냄
+    for match in re.finditer(pattern, text):
+        start, end = match.start(), match.end()
+        url = match.group(0)
+
+        # Bluesky facets는 byte 위치를 요구하므로, UTF-8 기준으로 byte offset 계산
+        byte_start = len(text[:start].encode('utf-8'))
+        byte_end = len(text[:end].encode('utf-8'))
+        print(f"[DEBUG] URL 감지됨: {url} (byteStart={byte_start}, byteEnd={byte_end})")
+
+        # Bluesky에서 링크를 facets로 인식하게 만들기 위한 구조
+        facets.append({
+            "index": {
+                "byteStart": byte_start,
+                "byteEnd": byte_end
+            },
+            "features": [
+                {
+                    "$type": "app.bsky.richtext.facet#link", # 링크 타입 지정
+                    "uri": url # 감지된 URL
+                }
+            ]
+        })
+    if facets:
+        print(f"[DEBUG] 총 facets 생성됨: {len(facets)}개")
+    else:
+        print("[DEBUG] facets 없음 (URL 미감지)")
+    return facets # URL 정보를 포함한 facets 리스트 반환
+
 def main():
     print("[DEBUG] 메인 함수 시작")
     quotes_dir = "./quotes"
@@ -150,7 +187,7 @@ def main():
 
     blocks = split_lines_with_images(body) # 본문에서 이미지 블록 분리
 
-    handle = "지정 핸들명.bsky.social"
+    handle = "userID.bsky.social"
     app_password = os.environ.get("BLUESKY_APP_PASSWORD") # 환경변수에서 비밀번호 가져오기
     if not app_password:
         return {"status": "error", "message": "Missing app password"} # 비밀번호 없으면 오류 반환
@@ -179,13 +216,28 @@ def main():
         print(f"[DEBUG] 블록 처리: {block['type']}")
         if block["type"] == "text":
             chunks = split_into_chunks(block["content"]) # 텍스트 블록을 작은 청크로 분할
-            for chunk in chunks:
+            for chunk in chunks: 
+                urls = re.findall(r'(https?://[^\s\)\]\}\<\>\"\']+)', chunk) # 텍스트 블록 안에서 URL을 추출
+                post_text = re.sub(r'(https?://[^\s\)\]\}\<\>\"\']+)', '', chunk).strip() # 기존 텍스트에서 URL을 제거하고 정리 (URL이 중복되어 facets가 두 번 붙는 걸 방지하기 위함)
+                
+                # URL이 존재하면, 텍스트 말미에 줄바꿈으로 URL을 다시 추가 (미리보기 유도)
+                if urls:
+                    post_text += "\n\n" + "\n".join(urls)
+                    
+                facets = extract_facets(post_text) # 가공된 최종 텍스트에서 facets를 추출
+
+                # Bluesky에 보낼 포스트 객체 구성
                 post = {
                     "$type": "app.bsky.feed.post",
-                    "text": chunk,
+                    "text": post_text,
                     "createdAt": now_timestamp(),
                     "langs": ["ko"]
                 }
+
+                if facets: # facets가 감지되었다면 포스트에 추가하여 하이퍼링크 기능 활성화
+                    post["facets"] = facets
+                    print(f"[DEBUG] facets 포함됨 (chunk): {facets}")
+
                 if parent: # 부모 포스트가 있으면 reply 정보 추가
                     post["reply"] = {
                         "root": {"cid": root["cid"], "uri": root["uri"]},
