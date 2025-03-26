@@ -18,6 +18,8 @@ The English translation page (using ChatGPT) is [here](https://github.com/sechsK
 - **이미지 크기 조정 및 압축**  
   블루스카이는 2048px 이하 / 1MB 이하 이미지만 업로드됩니다. Pillow 모듈을 사용하여 자동으로 크기와 용량을 조절합니다.
 
+- **하이퍼 링크(URL) 구현**  
+  블루스카이의 API와 연동해 facets를 가져와 텍스트에 URL 주소를 기재하면 자동으로 하이퍼 링크를 만듭니다.
 
 
 ## 필요 사항
