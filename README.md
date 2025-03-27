@@ -29,11 +29,12 @@ The English translation page (using ChatGPT) is [here](https://github.com/sechsK
   - `Pillow (PIL)`  
   → 설치:  
     ```bash
-    pip install atprototools pillow
+    pip install atprototools
     ```
     ```bash
     pip install atprototools[media]
     ```
+  ※ PIL은 콘솔 명령어가 아니라 후술할 Docker로 설치하셔야 합니다!
 
 - **필수 폴더와 파일**
   - `atprototools/` 폴더: Bluesky 로그인 및 미디어 업로드 API를 다루는 라이브러리
