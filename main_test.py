@@ -140,41 +140,134 @@ def split_into_chunks(text, max_length=300):
 
 # 이 줄부터 메인 실행 함수 - 텍스트 로드, 이미지 업로드, 게시물 생성까지 전체 수행
 
+# 블루스카이 핸들 하이퍼링크 감지 기능 (+ DID 자동 변환)
+def resolve_handle_to_did(handle):
+    try:
+        res = requests.get(
+            "https://bsky.social/xrpc/com.atproto.identity.resolveHandle",
+            params={"handle": handle}
+        )
+        res.raise_for_status()
+        return res.json()["did"]
+    except Exception as e:
+        print(f"[ERROR] DID resolve 실패: {handle} ({e})")
+        return None
+
 # URL을 감지하여 Bluesky API에서 하이퍼링크 미리보기(facets)를 붙일 수 있도록 구조화된 리스트로 반환
 def extract_facets(text):
-    text = re.sub(r'[\u00A0\u2000-\u200B\u202F\u205F\u3000]', ' ', text) # 다양한 종류의 유니코드 공백 문자들을 일반 공백(' ')으로 통일
-    text = text.replace('：', ':') # 전각 콜론(：)을 일반 콜론(:)으로 바꿔서 URL 인식에 방해되지 않도록 처리
+    print("[DEBUG] extract_facets 시작")
     facets = []
-    pattern = r'(https?://[^\s\)\]\}\<\>\"\']+)' # URL 패턴 정의: 괄호나 따옴표 등의 문자로 끝나지 않는 http/https 링크를 감지
+    text = re.sub(r'[\u00A0\u2000-\u200B\u202F\u205F\u3000]', ' ', text)
+    text = text.replace('：', ':')
 
-    # 텍스트 내에서 패턴과 일치하는 URL을 반복적으로 찾아냄
-    for match in re.finditer(pattern, text):
-        start, end = match.start(), match.end()
+    # URL 감지
+    print("[DEBUG] URL 패턴 검사 시작")
+    url_pattern = r'(https?://[^\s\)\]\}\<\>\"\']+)'
+    for match in re.finditer(url_pattern, text):
         url = match.group(0)
-
-        # Bluesky facets는 byte 위치를 요구하므로, UTF-8 기준으로 byte offset 계산
-        byte_start = len(text[:start].encode('utf-8'))
-        byte_end = len(text[:end].encode('utf-8'))
-        print(f"[DEBUG] URL 감지됨: {url} (byteStart={byte_start}, byteEnd={byte_end})")
-
-        # Bluesky에서 링크를 facets로 인식하게 만들기 위한 구조
+        byte_start = len(text[:match.start()].encode("utf-8"))
+        byte_end = len(text[:match.end()].encode("utf-8"))
         facets.append({
-            "index": {
-                "byteStart": byte_start,
-                "byteEnd": byte_end
-            },
-            "features": [
-                {
-                    "$type": "app.bsky.richtext.facet#link", # 링크 타입 지정
-                    "uri": url # 감지된 URL
-                }
-            ]
+            "index": {"byteStart": byte_start, "byteEnd": byte_end},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}]
         })
-    if facets:
+
+    # 핸들 감지 및 DID 자동 변환
+    print("[DEBUG] 핸들 패턴 검사 시작")
+    mention_pattern = r'@([a-zA-Z0-9_.-]+\.bsky\.social)'
+    for match in re.finditer(mention_pattern, text):
+        handle = match.group(1)
+        did = resolve_handle_to_did(handle)
+                if not did:
+            print(f"[WARNING] DID resolve 실패: {handle}")
+            continue
+        byte_start = len(text[:match.start()].encode("utf-8"))
+        byte_end = len(text[:match.end()].encode("utf-8"))
+                facets.append({
+            "index": {"byteStart": byte_start, "byteEnd": byte_end},
+            "features": [{
+                "$type": "app.bsky.richtext.facet#mention",
+                "did": did
+            }]
+        })
+        print(f"[DEBUG] 멘션 감지됨: @{handle} (DID: {did}, byteStart={byte_start}, byteEnd={byte_end})")
+
+        if facets:
         print(f"[DEBUG] 총 facets 생성됨: {len(facets)}개")
     else:
-        print("[DEBUG] facets 없음 (URL 미감지)")
-    return facets # URL 정보를 포함한 facets 리스트 반환
+        print("[DEBUG] facets 없음 (URL/멘션 미감지)")
+    return facets
+
+
+# 2. 자동 멘션 응답 키워드 분기
+def classify_request(text):
+    image_keywords = ["이미지", "그림", "사진"]
+    text_keywords = ["스크립트", "ss", "텍스트"]
+
+    text = text.lower().replace("：", ":").strip()
+
+    if any(k in text for k in image_keywords):
+        return "reply_image"
+    elif any(k in text for k in text_keywords):
+        return "reply_text"
+    return None
+
+# 3. NG 키워드 감지 + 카테고리별 거절 + 블랙리스트 등록
+
+NG_RULES = {
+    "비공식 커플링 명칭": {
+        "keywords": ["아키미즈", "타케미즈", "샤키미즈"],
+        "messages": ["봇주는 오메르타 시리즈의 비공식 커플링 관련 답변은 거절하고 있습니다."]
+    },
+    "비속어 및 취향 비하": {
+        "keywords": ["병신", "지랄", "좆", "이딴", "쓰레기", "역겹", "토나와"],
+        "messages": [
+            "저속한 표현은 삼가바랍니다.",
+            "타인의 취향을 존중할 줄 아는 오타쿠가 되시길 바랍니다.",
+            "불편하시면 뮤트나 차단 기능을 활용해주세요."
+        ]
+    },
+    "타 BL 게임 언급": {
+        "keywords": ["드라마티컬 머더", "라키드", "니트로 키랄"],
+        "messages": [
+            "본 봇은 「오메르타 시리즈(오메르타 ~침묵의 규율~ & 오메르타 CODE:TYCOON)의 팬봇입니다. 다른 메이커의 작품과 캐릭터, 커플링 답변은 사양합니다.」"
+        ]
+    },
+    "다른 카린 게임 작품": {
+        "keywords": ["단죄의 마리아", "오메가 뱀파이어", "절대미궁그림"],
+        "messages": ["본 봇은 오메르타 시리즈의 팬봇이기에 카린에서 개발된 게임들의 답변은 거절합니다."]
+    }
+}
+
+IGNORED_DID_FILE = "quotes/ignored_dids.txt"
+
+
+def check_ng_category(text):
+    for category, rule in NG_RULES.items():
+        for kw in rule["keywords"]:
+            if kw in text:
+                return random.choice(rule["messages"]), kw
+    return None, None
+
+
+def log_ng_mention(cid, author_did, keyword, message, text):
+    with open("quotes/ng_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.utcnow().isoformat()}Z] CID: {cid} | Author: {author_did}\n")
+        f.write(f"Keyword: '{keyword}' | Message: '{message}'\n")
+        f.write(f"Text: {text}\n\n")
+
+
+def add_to_ignored_dids(new_dids):
+    current = set()
+    if os.path.exists(IGNORED_DID_FILE):
+        with open(IGNORED_DID_FILE, "r", encoding="utf-8") as f:
+            current = set(line.strip() for line in f if line.strip())
+
+    with open(IGNORED_DID_FILE, "a", encoding="utf-8") as f:
+        for did in new_dids:
+            if did not in current:
+                f.write(did + "\n")
+                print(f"[INFO] 무시 대상 등록됨: {did}")
 
 def main():
     print("[DEBUG] 메인 함수 시작")
