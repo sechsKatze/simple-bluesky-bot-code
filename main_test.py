@@ -100,14 +100,20 @@ def load_random_work(quotes_dir="./quotes/posts"):
         return chosen_file.replace(".txt", ""), f.read()
 
 # 자동 멘션 텍스트 응답 로딩 (quotes/replies/)
-def load_random_reply(quotes_dir="./quotes/replies"):
-    print(f"[DEBUG] 랜덤 답변 텍스트 로드 시도 - 폴더: {quotes_dir}")
+def load_random_reply_chunk(quotes_dir="./quotes/replies"):
+    print(f"[DEBUG] 랜덤 답변 텍스트 청크 로드 시도 - 폴더: {quotes_dir}")
     files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")]
     if not files:
-        return None, None
+        return None
     chosen_file = random.choice(files)
     with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
-        return chosen_file.replace(".txt", ""), f.read()
+        content = f.read()
+    chunks = split_into_chunks(content)
+    if not chunks:
+        return None
+    selected = random.choice(chunks)
+    print(f"[DEBUG] 선택된 답변 청크 ({len(selected)}자): {selected[:50]}...")
+    return selected
 
 # 자동 멘션 이미지 응답 로딩 (quotes/reply_images/)
 def load_random_reply_image(quotes_dir="./quotes/reply_images"):
@@ -117,6 +123,72 @@ def load_random_reply_image(quotes_dir="./quotes/reply_images"):
     if not files:
         return None
     return os.path.join(quotes_dir, random.choice(files))
+
+# 자동 멘션 처리 함수
+def handle_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt, did):
+    print(f"[DEBUG] 멘션 처리 시작: '{mention_text}'")
+    
+    # NG 키워드 체크
+    ng_message, ng_keyword = check_ng_category(mention_text)
+    if ng_message:
+        print(f"[INFO] NG 키워드 감지됨: '{ng_keyword}' → 거절 메시지 전송")
+        post = {
+            "$type": "app.bsky.feed.post",
+            "text": ng_message,
+            "createdAt": now_timestamp(),
+            "langs": ["ko"],
+            "reply": {
+                "root": {"cid": root_cid, "uri": root_uri},
+                "parent": {"cid": parent_cid, "uri": parent_uri}
+            }
+        }
+        create_record(jwt, did, "app.bsky.feed.post", post)
+        return
+
+    # 자동 응답 분기
+    req_type = classify_request(mention_text)
+
+    if req_type == "reply_text":
+        reply_text = load_random_reply_chunk()
+        if reply_text:
+            post = {
+                "$type": "app.bsky.feed.post",
+                "text": reply_text,
+                "createdAt": now_timestamp(),
+                "langs": ["ko"],
+                "reply": {
+                    "root": {"cid": root_cid, "uri": root_uri},
+                    "parent": {"cid": parent_cid, "uri": parent_uri}
+                }
+            }
+            create_record(jwt, did, "app.bsky.feed.post", post)
+
+    elif req_type == "reply_image":
+        image_path = load_random_reply_image()
+        if image_path and os.path.exists(image_path):
+            try:
+                image_bytes, mime = compress_image(image_path)
+                blob = upload_blob(jwt, image_bytes, mime)
+                post = {
+                    "$type": "app.bsky.feed.post",
+                    "text": "📷 요청하신 이미지를 첨부합니다.",
+                    "createdAt": now_timestamp(),
+                    "langs": ["ko"],
+                    "embed": {
+                        "$type": "app.bsky.embed.images",
+                        "images": [{
+                            "alt": os.path.basename(image_path),
+                            "image": blob
+                        }]
+                    },
+                    "reply": {
+                        "root": {"cid": root_cid, "uri": root_uri},
+                        "parent": {"cid": parent_cid, "uri": parent_uri}
+                    }
+                }
+                create_record(jwt, did, "app.bsky.feed.post", post)
+            except Exception as e:
+                print(f"[ERROR] 이미지 응답 실패: {e}")
 
 # 텍스트에서 이미지 파일명을 추출하여 텍스트/이미지 블록으로 분리
 def split_lines_with_images(text):
