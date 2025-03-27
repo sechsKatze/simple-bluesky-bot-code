@@ -171,6 +171,7 @@ def extract_facets(text):
             "index": {"byteStart": byte_start, "byteEnd": byte_end},
             "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}]
         })
+        print(f"[DEBUG] URL 감지됨: {url} (byteStart={byte_start}, byteEnd={byte_end})")
 
     # 핸들 감지 및 DID 자동 변환
     print("[DEBUG] 핸들 패턴 검사 시작")
@@ -178,12 +179,12 @@ def extract_facets(text):
     for match in re.finditer(mention_pattern, text):
         handle = match.group(1)
         did = resolve_handle_to_did(handle)
-                if not did:
+        if not did:
             print(f"[WARNING] DID resolve 실패: {handle}")
             continue
         byte_start = len(text[:match.start()].encode("utf-8"))
         byte_end = len(text[:match.end()].encode("utf-8"))
-                facets.append({
+        facets.append({
             "index": {"byteStart": byte_start, "byteEnd": byte_end},
             "features": [{
                 "$type": "app.bsky.richtext.facet#mention",
@@ -192,7 +193,7 @@ def extract_facets(text):
         })
         print(f"[DEBUG] 멘션 감지됨: @{handle} (DID: {did}, byteStart={byte_start}, byteEnd={byte_end})")
 
-        if facets:
+    if facets:
         print(f"[DEBUG] 총 facets 생성됨: {len(facets)}개")
     else:
         print("[DEBUG] facets 없음 (URL/멘션 미감지)")
