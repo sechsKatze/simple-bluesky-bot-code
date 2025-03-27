@@ -89,15 +89,34 @@ def upload_blob(jwt, image_bytes, mime_type="image/jpeg"):
     res.raise_for_status() # 오류 발생 시 예외를 발생시킴
     return res.json()["blob"] # 업로드된 이미지의 blob 참조 반환
 
-# quotes 폴더에서 랜덤한 .txt 파일을 선택하고 제목과 내용을 반환
-def load_random_work(quotes_dir="./quotes"):
+# 자동 포스트용 텍스트 로딩 (quotes/posts/)
+def load_random_work(quotes_dir="./quotes/posts"):
     print(f"[DEBUG] 랜덤 텍스트 로드 시도 - 폴더: {quotes_dir}")
-    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")] # .txt 파일만 선택
+    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")]
     if not files:
-        return None, None # 파일이 없으면 None 반환
-    chosen_file = random.choice(files) # 랜덤으로 파일 선택
+        return None, None
+    chosen_file = random.choice(files)
     with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
-        return chosen_file.replace(".txt", ""), f.read() # 제목과 내용을 반환
+        return chosen_file.replace(".txt", ""), f.read()
+
+# 자동 멘션 텍스트 응답 로딩 (quotes/replies/)
+def load_random_reply(quotes_dir="./quotes/replies"):
+    print(f"[DEBUG] 랜덤 답변 텍스트 로드 시도 - 폴더: {quotes_dir}")
+    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")]
+    if not files:
+        return None, None
+    chosen_file = random.choice(files)
+    with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
+        return chosen_file.replace(".txt", ""), f.read()
+
+# 자동 멘션 이미지 응답 로딩 (quotes/reply_images/)
+def load_random_reply_image(quotes_dir="./quotes/reply_images"):
+    print(f"[DEBUG] 랜덤 답변 이미지 로드 시도 - 폴더: {quotes_dir}")
+    image_exts = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+    files = [f for f in os.listdir(quotes_dir) if f.lower().endswith(image_exts)]
+    if not files:
+        return None
+    return os.path.join(quotes_dir, random.choice(files))
 
 # 텍스트에서 이미지 파일명을 추출하여 텍스트/이미지 블록으로 분리
 def split_lines_with_images(text):
