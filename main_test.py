@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 import requests
 from PIL import Image
 import io
+import json
+import traceback
 
 # 현재 UTC 타임스탬프를 ISO 8601 형식으로 반환
 def now_timestamp():
@@ -272,6 +274,25 @@ def remove_from_ignored_dids(target_did):
         for line in lines:
             f.write(line + "\n")
 
+# 하루에 질문 10회 제한
+MENTION_COUNT_FILE = "/tmp/mention_counts.json"
+
+def track_mention_count(did):
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    data = {}
+    if os.path.exists(MENTION_COUNT_FILE):
+        with open(MENTION_COUNT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+    if today not in data:
+        data[today] = {}
+
+    data[today][did] = data[today].get(did, 0) + 1
+
+    with open(MENTION_COUNT_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    return data[today][did]
+
 # 자동 맨션 기능
 def process_mentions(auth):
     print("[DEBUG] Mentions 처리 시작")
@@ -316,12 +337,30 @@ def process_mentions(auth):
 
         if author_did == OWNER_DID and "블랙리스트 해제" in text:
             # 해제할 대상 추출 (예: "@wonguobot 블랙리스트 해제 @did:plc:xxxx")
-            match = re.search(r"@([a-zA-Z0-9_.:-]+)", text)
-            if match:
-                target_did = match.group(1)
-                remove_from_ignored_dids(target_did)
-                print(f"[INFO] 블랙리스트 해제됨: {target_did}")
-                # 확인 메시지 보내기 등도 가능
+                match = re.search(r"@([a-zA-Z0-9_.:-]+)", text)
+                if match:
+                    target_did = match.group(1)
+                    remove_from_ignored_dids(target_did)
+                    print(f"[INFO] 블랙리스트 해제됨: {target_did}")
+
+                    # 블랙리스트 해제 알림 멘션도 여기서 함께 처리
+                    if jwt and did:
+                        post = {
+                            "$type": "app.bsky.feed.post",
+                            "text": f"✅ @{target_did} 블랙리스트에서 해제되었습니다.",
+                            "createdAt": now_timestamp(),
+                            "langs": ["ko"]
+                        }
+                        create_record(jwt, did, "app.bsky.feed.post", post)
+                else:
+                    print("[WARNING] 블랙리스트 해제 명령어는 있지만 대상 DID를 찾지 못함.")
+                create_record(jwt, did, "app.bsky.feed.post", post)
+
+        count = track_mention_count(author_did)
+        if count > 10:
+            print(f"[INFO] {author_did} - 하루 멘션 {count}회 초과 → 무시 목록 등록")
+            add_to_ignored_dids([author_did])
+            mark_cid_processed(cid)
             continue
 
         log_mention(cid, author_did, text)
@@ -441,7 +480,7 @@ def classify_request(text):
     has_text_kw = any(k in text for k in text_keywords)
 
     if has_image_kw and has_text_kw:
-        return None  # 텍스트와 이미지 키워드가 모두 있으면 응답 생략
+        return "ambiguous"  # 텍스트와 이미지 키워드가 모두 있으면 응답 생략
     elif has_image_kw:
         return "reply_image"
     elif has_text_kw:
@@ -450,11 +489,24 @@ def classify_request(text):
         return None
 
 # 3. NG 키워드 감지 + 카테고리별 거절 + 블랙리스트 등록
-# 커스텀이 가능하며 리스트를 중복 기재 가능합니다.
+# 커스텀이 가능합니다. 
 NG_RULES = {
-    "리스트": {
-        "keywords": ["키워드1", "키워드2"],
-        "messages": ["NG 자동응답 메시지."]
+    "비공식 커플링 명칭": {
+        "keywords": ["우가진×우오즈미", "우가진×웡", "우가우오", "우가웡", "JJ×우오즈미", "J우오즈미", "웡×JJ", "웡J", "비공식"],
+        "messages": ["봇주는 오메르타 시리즈의 비공식 커플링 관련 주제를 거부하고 있습니다."]
+    },
+    "비속어 및 취향 비하": {
+        "keywords": ["병신", "지랄", "좆", "이딴", "쓰레기", "씨발", "니미", "한남", "한녀", "한남충", "김치녀", "남미새", "여미새", "역겹", "토나와", "두창","왜 좋아해?", "왜 좋아하냐?"],
+        "messages": [
+            "저속한 표현은 삼가바랍니다.",
+            "타인의 취향을 존중할 줄 아는 오타쿠가 되시길 바랍니다.",
+            "불편하시면 뮤트나 차단 기능을 활용해주세요."
+        ]
+    },
+
+    "다른 카린 게임 작품": {
+        "keywords": ["단죄의 마리아", "오메가 뱀파이어", "절대미궁그림", "절대미궁", "절대미궁 비밀의 엄지공주", "프린세스 나이트메어", "아니마 문디"],
+        "messages": ["본 봇은 오메르타 시리즈의 서브 커플링 웡우오 전용 팬봇입니다. 즉 카린 작품 통합 봇이 아닙니다."]
     }
 }
 
@@ -638,6 +690,5 @@ def lambda_handler(event, context):
         return main(auth)
     except Exception as e:
         print(f"[ERROR] Lambda 전체 처리 중 오류: {e}")
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
-
-
