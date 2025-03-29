@@ -13,8 +13,17 @@ import io
 def now_timestamp():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z") # 현재 시간을 UTC로 가져오고 마이크로초를 제거한 후 ISO 8601 형식으로 반환
 
+HANDLE_ENV = "BLUESKY_HANDLE"
+APP_PASSWORD_ENV = "BLUESKY_APP_PASSWORD"
+
 # Bluesky 계정으로 로그인하여 JWT 토큰과 DID 값을 가져옴
-def bluesky_login(handle, app_password):
+def bluesky_login():
+    handle = os.environ.get(HANDLE_ENV)
+    app_password = os.environ.get(APP_PASSWORD_ENV)
+
+    if not handle or not app_password:
+        raise ValueError("환경 변수에서 핸들이나 앱 비밀번호를 찾을 수 없습니다.")
+
     print(f"[DEBUG] Bluesky 로그인 시도 - handle: {handle}")
     res = requests.post(
         "https://bsky.social/xrpc/com.atproto.server.createSession", # Bluesky 로그인 API 호출
@@ -23,6 +32,13 @@ def bluesky_login(handle, app_password):
     )
     res.raise_for_status() # 오류 발생 시 예외를 발생시킴
     return res.json() # 로그인 후 JWT와 DID 값을 포함한 응답 반환
+
+def is_ignored_did(did):
+    if not os.path.exists(IGNORED_DID_FILE):
+        return False
+    with open(IGNORED_DID_FILE, "r", encoding="utf-8") as f:
+        return did.strip() in [line.strip() for line in f if line.strip()]
+
 
 # Bluesky에 새 게시물을 생성하는 API 호출
 def create_record(jwt, repo, collection, record):
@@ -89,45 +105,66 @@ def upload_blob(jwt, image_bytes, mime_type="image/jpeg"):
     res.raise_for_status() # 오류 발생 시 예외를 발생시킴
     return res.json()["blob"] # 업로드된 이미지의 blob 참조 반환
 
+POSTS_DIR = "./quotes/posts"
+REPLIES_DIR = "./quotes/replies"
+REPLY_IMAGES_DIR = "./quotes/reply_images"
+
 # 자동 포스트용 텍스트 로딩 (quotes/posts/)
-def load_random_work(quotes_dir="./quotes/posts"):
-    print(f"[DEBUG] 랜덤 텍스트 로드 시도 - 폴더: {quotes_dir}")
-    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")]
+def load_random_work():
+    print(f"[DEBUG] 랜덤 텍스트 로드 시도 - 폴더: {POSTS_DIR}")
+    files = [f for f in os.listdir(POSTS_DIR) if f.endswith(".txt")]
     if not files:
         return None, None
     chosen_file = random.choice(files)
-    with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
+    with open(os.path.join(POSTS_DIR, chosen_file), encoding="utf-8") as f:
         return chosen_file.replace(".txt", ""), f.read()
 
 # 자동 멘션 텍스트 응답 로딩 (quotes/replies/)
-def load_random_reply_chunk(quotes_dir="./quotes/replies"):
-    print(f"[DEBUG] 랜덤 답변 텍스트 청크 로드 시도 - 폴더: {quotes_dir}")
-    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")]
+def load_random_reply_chunk():
+    print(f"[DEBUG] 랜덤 답변 텍스트 청크 로드 시도 - 폴더: {REPLIES_DIR}")
+    files = [f for f in os.listdir(REPLIES_DIR) if f.endswith(".txt")]
+    print(f"[DEBUG] 텍스트 파일 목록: {files}")
+
     if not files:
+        print("[WARNING] 텍스트 응답용 파일 없음")
         return None
+
     chosen_file = random.choice(files)
-    with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
+    with open(os.path.join(REPLIES_DIR, chosen_file), encoding="utf-8") as f:
         content = f.read()
-    chunks = split_into_chunks(content)
+
+    # 본문만 추출 (--- 구분선 기준)
+    parts = content.split('---')
+    if len(parts) < 2:
+        print("[WARNING] --- 구분선이 없어 본문만 사용")
+        main_text = content
+    else:
+        main_text = parts[1].strip()  # 본문만 추출
+
+    chunks = split_into_chunks(main_text)
+    print(f"[DEBUG] 총 {len(chunks)}개 청크 추출됨")
+
     if not chunks:
+        print(f"[WARNING] 청크 없음 (파일 이름: {chosen_file})")
         return None
+
     selected = random.choice(chunks)
-    print(f"[DEBUG] 선택된 답변 청크 ({len(selected)}자): {selected[:50]}...")
+    print(f"[DEBUG] 선택된 청크: {selected[:50]}...")
     return selected
 
 # 자동 멘션 이미지 응답 로딩 (quotes/reply_images/)
-def load_random_reply_image(quotes_dir="./quotes/reply_images"):
-    print(f"[DEBUG] 랜덤 답변 이미지 로드 시도 - 폴더: {quotes_dir}")
+def load_random_reply_image():
+    print(f"[DEBUG] 랜덤 답변 이미지 로드 시도 - 폴더: {REPLY_IMAGES_DIR}")
     image_exts = (".jpg", ".jpeg", ".png", ".webp", ".gif")
-    files = [f for f in os.listdir(quotes_dir) if f.lower().endswith(image_exts)]
+    files = [f for f in os.listdir(REPLY_IMAGES_DIR) if f.lower().endswith(image_exts)]
     if not files:
         return None
-    return os.path.join(quotes_dir, random.choice(files))
+    return os.path.join(REPLY_IMAGES_DIR, random.choice(files))
 
-# 자동 멘션 처리 함수
+# 자동 멘션 텍스트 응답 로딩
 def handle_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt, did):
     print(f"[DEBUG] 멘션 처리 시작: '{mention_text}'")
-    
+
     # NG 키워드 체크
     ng_message, ng_keyword = check_ng_category(mention_text)
     if ng_message:
@@ -147,10 +184,12 @@ def handle_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt
 
     # 자동 응답 분기
     req_type = classify_request(mention_text)
-
+    print(f"[DEBUG] classify_request 결과: {req_type}") 
     if req_type == "reply_text":
+        print("[DEBUG] reply_text 분기 진입")
         reply_text = load_random_reply_chunk()
         if reply_text:
+            print(f"[DEBUG] 응답할 텍스트: {reply_text[:50]}...")
             post = {
                 "$type": "app.bsky.feed.post",
                 "text": reply_text,
@@ -161,7 +200,25 @@ def handle_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt
                     "parent": {"cid": parent_cid, "uri": parent_uri}
                 }
             }
+            try:
+                create_record(jwt, did, "app.bsky.feed.post", post)
+                print("[DEBUG] 텍스트 포스트 전송 성공")
+            except Exception as e:
+                print(f"[ERROR] 텍스트 포스트 전송 실패: {e}")
+        else:
+            # fallback 응답
+            post = {
+                "$type": "app.bsky.feed.post",
+                "text": "⚠️ 텍스트 응답이 현재 준비되어 있지 않습니다. 나중에 다시 시도해주세요.",
+                "createdAt": now_timestamp(),
+                "langs": ["ko"],
+                "reply": {
+                    "root": {"cid": root_cid, "uri": root_uri},
+                    "parent": {"cid": parent_cid, "uri": parent_uri}
+                }
+            }
             create_record(jwt, did, "app.bsky.feed.post", post)
+            print("[WARNING] 텍스트 응답 실패 - fallback 메시지 전송 완료")
 
     elif req_type == "reply_image":
         image_path = load_random_reply_image()
@@ -189,6 +246,88 @@ def handle_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt
                 create_record(jwt, did, "app.bsky.feed.post", post)
             except Exception as e:
                 print(f"[ERROR] 이미지 응답 실패: {e}")
+
+    elif req_type == "ambiguous":
+        post = {
+            "$type": "app.bsky.feed.post",
+            "text": "⚠️ 텍스트와 이미지 요청이 동시에 감지되었습니다. 한 번에 하나씩 요청해주세요.",
+            "createdAt": now_timestamp(),
+            "langs": ["ko"],
+            "reply": {
+                "root": {"cid": root_cid, "uri": root_uri},
+                "parent": {"cid": parent_cid, "uri": parent_uri}
+            }
+        }
+        create_record(jwt, did, "app.bsky.feed.post", post)
+
+# 블랙리스트 해제 멘션을 보내면 해당 계정은 블랙리스트에서 제거됨.
+OWNER_DID = os.environ.get("BLUESKY_DID")
+
+def remove_from_ignored_dids(target_did):
+    if not os.path.exists(IGNORED_DID_FILE):
+        return
+    with open(IGNORED_DID_FILE, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip() and line.strip() != target_did]
+    with open(IGNORED_DID_FILE, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+# 자동 맨션 기능
+def process_mentions(auth):
+    print("[DEBUG] Mentions 처리 시작")
+
+    jwt = auth["accessJwt"]
+    did = auth["did"]
+
+    res = requests.get(
+        "https://bsky.social/xrpc/app.bsky.notification.listNotifications",
+        headers={"Authorization": f"Bearer {jwt}"},
+        params={"limit": 50}
+    )
+    res.raise_for_status()
+    notifications = res.json().get("notifications", [])
+
+    for notif in notifications:
+        if notif.get("reason") != "mention":
+            continue
+
+        cid = notif["cid"]
+        if is_already_processed(cid):
+            print(f"[INFO] 이미 처리된 멘션: {cid}")
+            continue
+
+        author = notif["author"]
+        author_did = author["did"]
+        uri = notif["uri"]
+        text = notif.get("record", {}).get("text", "")
+
+        if is_ignored_did(author_did):
+            print(f"[INFO] 무시된 DID: {author_did}")
+            mark_cid_processed(cid)
+            continue
+
+        ng_msg, ng_kw = check_ng_category(text)
+        if ng_msg:
+            log_ng_mention(cid, author_did, ng_kw, ng_msg, text)
+            add_to_ignored_dids([author_did])
+            handle_mention(text, cid, uri, cid, uri, jwt, did)
+            mark_cid_processed(cid)
+            continue
+
+        if author_did == OWNER_DID and "블랙리스트 해제" in text:
+            # 해제할 대상 추출 (예: "@wonguobot 블랙리스트 해제 @did:plc:xxxx")
+            match = re.search(r"@([a-zA-Z0-9_.:-]+)", text)
+            if match:
+                target_did = match.group(1)
+                remove_from_ignored_dids(target_did)
+                print(f"[INFO] 블랙리스트 해제됨: {target_did}")
+                # 확인 메시지 보내기 등도 가능
+            continue
+
+        log_mention(cid, author_did, text)
+        handle_mention(text, cid, uri, cid, uri, jwt, did)
+        mark_cid_processed(cid)
+        print(f"[DEBUG] 멘션 응답 완료: {cid} ({author['handle']})")
 
 # 텍스트에서 이미지 파일명을 추출하여 텍스트/이미지 블록으로 분리
 def split_lines_with_images(text):
@@ -298,41 +437,28 @@ def classify_request(text):
 
     text = text.lower().replace("：", ":").strip()
 
-    if any(k in text for k in image_keywords):
+    has_image_kw = any(k in text for k in image_keywords)
+    has_text_kw = any(k in text for k in text_keywords)
+
+    if has_image_kw and has_text_kw:
+        return None  # 텍스트와 이미지 키워드가 모두 있으면 응답 생략
+    elif has_image_kw:
         return "reply_image"
-    elif any(k in text for k in text_keywords):
+    elif has_text_kw:
         return "reply_text"
-    return None
+    else:
+        return None
 
 # 3. NG 키워드 감지 + 카테고리별 거절 + 블랙리스트 등록
-
+# 커스텀이 가능하며 리스트를 중복 기재 가능합니다.
 NG_RULES = {
-    "비공식 커플링 명칭": {
-        "keywords": ["아키미즈", "타케미즈", "샤키미즈"],
-        "messages": ["봇주는 오메르타 시리즈의 비공식 커플링 관련 답변은 거절하고 있습니다."]
-    },
-    "비속어 및 취향 비하": {
-        "keywords": ["병신", "지랄", "좆", "이딴", "쓰레기", "역겹", "토나와"],
-        "messages": [
-            "저속한 표현은 삼가바랍니다.",
-            "타인의 취향을 존중할 줄 아는 오타쿠가 되시길 바랍니다.",
-            "불편하시면 뮤트나 차단 기능을 활용해주세요."
-        ]
-    },
-    "타 BL 게임 언급": {
-        "keywords": ["드라마티컬 머더", "라키드", "니트로 키랄"],
-        "messages": [
-            "본 봇은 「오메르타 시리즈(오메르타 ~침묵의 규율~ & 오메르타 CODE:TYCOON)의 팬봇입니다. 다른 메이커의 작품과 캐릭터, 커플링 답변은 사양합니다.」"
-        ]
-    },
-    "다른 카린 게임 작품": {
-        "keywords": ["단죄의 마리아", "오메가 뱀파이어", "절대미궁그림"],
-        "messages": ["본 봇은 오메르타 시리즈의 팬봇이기에 카린에서 개발된 게임들의 답변은 거절합니다."]
+    "리스트": {
+        "keywords": ["키워드1", "키워드2"],
+        "messages": ["NG 자동응답 메시지."]
     }
 }
 
-IGNORED_DID_FILE = "quotes/ignored_dids.txt"
-
+IGNORED_DID_FILE = "/tmp/ignored_dids.txt"
 
 def check_ng_category(text):
     for category, rule in NG_RULES.items():
@@ -343,11 +469,15 @@ def check_ng_category(text):
 
 
 def log_ng_mention(cid, author_did, keyword, message, text):
-    with open("quotes/ng_log.txt", "a", encoding="utf-8") as f:
+    with open("/tmp/ng_log.txt", "a", encoding="utf-8") as f:
         f.write(f"[{datetime.utcnow().isoformat()}Z] CID: {cid} | Author: {author_did}\n")
         f.write(f"Keyword: '{keyword}' | Message: '{message}'\n")
         f.write(f"Text: {text}\n\n")
 
+def log_mention(cid, author_did, text):
+    with open("/tmp/mention_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.utcnow().isoformat()}Z] CID: {cid} | Author: {author_did}\n")
+        f.write(f"Text: {text}\n\n")
 
 def add_to_ignored_dids(new_dids):
     current = set()
@@ -361,33 +491,35 @@ def add_to_ignored_dids(new_dids):
                 f.write(did + "\n")
                 print(f"[INFO] 무시 대상 등록됨: {did}")
 
-def main():
-    print("[DEBUG] 메인 함수 시작")
-    quotes_dir = "./quotes"
-    work_title, content = load_random_work(quotes_dir) # 랜덤 텍스트 로드
-    if not content:
-        return {"status": "error", "message": "No content loaded"} # 내용이 없으면 오류 반환
+# 이미 처리한 멘션이면 skip
+PROCESSED_CID_FILE = "/tmp/processed_cids.txt"
 
-    parts = content.split('---') # 내용 분리 (헤드, 본문, 클로징)
+def is_already_processed(cid):
+    if not os.path.exists(PROCESSED_CID_FILE):
+        return False
+    with open(PROCESSED_CID_FILE, "r", encoding="utf-8") as f:
+        return cid in [line.strip() for line in f if line.strip()]
+
+def mark_cid_processed(cid):
+    with open(PROCESSED_CID_FILE, "a", encoding="utf-8") as f:
+        f.write(cid + "\n")
+
+
+def main(auth):
+    print("[DEBUG] 메인 함수 시작")
+    work_title, content = load_random_work()
+    if not content:
+        return {"status": "error", "message": "No content loaded"}
+
+    parts = content.split('---')
     head_text = parts[0].strip() if len(parts) >= 1 else ""
     body = parts[1].strip() if len(parts) >= 2 else ""
     closing = parts[2].strip() if len(parts) == 3 else ""
 
-    blocks = split_lines_with_images(body) # 본문에서 이미지 블록 분리
+    blocks = split_lines_with_images(body)
 
-    handle = "userID.bsky.social"
-    app_password = os.environ.get("BLUESKY_APP_PASSWORD") # 환경변수에서 비밀번호 가져오기
-    if not app_password:
-        return {"status": "error", "message": "Missing app password"} # 비밀번호 없으면 오류 반환
-
-    auth = bluesky_login(handle, app_password) # Bluesky 로그인
-    print("[DEBUG] 로그인 성공, DID:", auth["did"])
     jwt = auth["accessJwt"]
     did = auth["did"]
-
-    parent = None # 부모 포스트 초기화
-    root = None # 루트 포스트 초기화
-    prev_text = None # 이전 텍스트 저장 변수 초기화
 
     if head_text:
         print("[DEBUG] 서두 텍스트 존재. 첫 포스트 생성.")
@@ -397,7 +529,7 @@ def main():
             "createdAt": now_timestamp(),
             "langs": ["ko"]
         }
-        root = parent = create_record(jwt, repo=did, collection="app.bsky.feed.post", record=post) # 첫 포스트 생성
+        root = parent = create_record(jwt, repo=did, collection="app.bsky.feed.post", record=post)
 
     # 본문 블록 처리
     for block in blocks:
@@ -435,7 +567,7 @@ def main():
                 prev_text = chunk # 텍스트가 처리될 때 prev_text 갱신
 
         elif block["type"] == "image":
-            image_path = os.path.join(quotes_dir, block["filename"]) # 이미지 파일 경로
+            image_path = os.path.join(POSTS_DIR, block["filename"]) # 이미지 파일 경로
             if os.path.exists(image_path):
                 try:
                     print(f"[DEBUG] 이미지 파일 존재: {image_path}")
@@ -500,4 +632,12 @@ def main():
 # AWS Lambda에서 진입점 역할을 하는 핸들러 함수
 def lambda_handler(event, context):
     print("[DEBUG] Lambda 핸들러 실행 시작")
-    return main() # 메인 함수 실행
+    try:
+        auth = bluesky_login()
+        process_mentions(auth)
+        return main(auth)
+    except Exception as e:
+        print(f"[ERROR] Lambda 전체 처리 중 오류: {e}")
+        return {"status": "error", "message": str(e)}
+
+
