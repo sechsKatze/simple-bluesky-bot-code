@@ -4,6 +4,7 @@
 # - quotes 폴더에 이미지 파일을 넣으면 이미지 업로드, 블루스카이 규격에 맞게 자동으로 최적화
 # - 하이퍼 링크(URL)과 핸들명 링크 구현.
 # - 질문, 요청 시 해당 주제에 맞는 답변을 전달하는 자동 멘션 기능.
+# - AWS Lambda의 이벤트 트리거 기능을 이용해 포스트는 1시간, 자동 멘션은 1분에 답하는 연동.
 # Bluesky API의 구조와 사용된 API 목록 :
 # - JWT 로그인: /xrpc/com.atproto.server.createSession
 # - 포스트 업로드: /xrpc/com.atproto.repo.createRecord
