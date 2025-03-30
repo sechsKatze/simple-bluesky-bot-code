@@ -1,5 +1,10 @@
 # 현재로서 최종 코드.
-# Bluesky API의 구조와 사용된 API 목록:
+# 구현된 기능 :
+# - 300자가 넘어가면 자동으로 스레드로 분할.
+# - quotes 폴더에 이미지 파일을 넣으면 이미지 업로드, 블루스카이 규격에 맞게 자동으로 최적화
+# - 하이퍼 링크(URL)과 핸들명 링크 구현.
+# - 질문, 요청 시 해당 주제에 맞는 답변을 전달하는 자동 멘션 기능.
+# Bluesky API의 구조와 사용된 API 목록 :
 # - JWT 로그인: /xrpc/com.atproto.server.createSession
 # - 포스트 업로드: /xrpc/com.atproto.repo.createRecord
 # - 이미지 업로드(blob): /xrpc/com.atproto.repo.uploadBlob
