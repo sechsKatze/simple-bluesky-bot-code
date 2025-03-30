@@ -1,6 +1,9 @@
-# 최종 코드. 
-# 구현 기능 : 300자 분할 스레드, 이미지 업로드 및 최적화, 링크 텍스트 감지 URL화
-# 추가 예정 기능 : 핸들 하이퍼 링크 및 DID화로 핸들명 감지, 특정 키워드로 답변을 받을 시 맞는 답변을 돌려주는 기능, NG 키워드 입력 시 거절 응답. 지속적으로 NG 키워드를 입력하면 블랙리스트 등록 후 무응답 처리하는 뮤트 기능. 현재 main_test.py에 정리중.
+# 현재로서 최종 코드.
+# Bluesky API의 구조와 사용된 API 목록:
+# - JWT 로그인: /xrpc/com.atproto.server.createSession
+# - 포스트 업로드: /xrpc/com.atproto.repo.createRecord
+# - 이미지 업로드(blob): /xrpc/com.atproto.repo.uploadBlob
+# - 알림 목록 확인: /xrpc/app.bsky.notification.listNotifications
 
 import os
 import re
