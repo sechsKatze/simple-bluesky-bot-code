@@ -5,17 +5,30 @@
 import os
 import re
 import random
-from datetime import datetime, timezone
 import requests
-from PIL import Image
 import io
+import json
+import traceback
+import unicodedata
+from datetime import datetime, timezone
+from PIL import Image
+from collections import OrderedDict
 
 # 현재 UTC 타임스탬프를 ISO 8601 형식으로 반환
 def now_timestamp():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z") # 현재 시간을 UTC로 가져오고 마이크로초를 제거한 후 ISO 8601 형식으로 반환
 
+HANDLE_ENV = "BLUESKY_HANDLE"
+APP_PASSWORD_ENV = "BLUESKY_APP_PASSWORD"
+
 # Bluesky 계정으로 로그인하여 JWT 토큰과 DID 값을 가져옴
-def bluesky_login(handle, app_password):
+def bluesky_login():
+    handle = os.environ.get(HANDLE_ENV)
+    app_password = os.environ.get(APP_PASSWORD_ENV)
+
+    if not handle or not app_password:
+        raise ValueError("환경 변수에서 핸들이나 앱 비밀번호를 찾을 수 없습니다.")
+
     print(f"[DEBUG] Bluesky 로그인 시도 - handle: {handle}")
     res = requests.post(
         "https://bsky.social/xrpc/com.atproto.server.createSession", # Bluesky 로그인 API 호출
@@ -25,23 +38,36 @@ def bluesky_login(handle, app_password):
     res.raise_for_status() # 오류 발생 시 예외를 발생시킴
     return res.json() # 로그인 후 JWT와 DID 값을 포함한 응답 반환
 
+def is_ignored_did(did):
+    if not os.path.exists(IGNORED_DID_FILE):
+        return False
+    with open(IGNORED_DID_FILE, "r", encoding="utf-8") as f:
+        return did.strip() in [line.strip() for line in f if line.strip()]
+
+
 # Bluesky에 새 게시물을 생성하는 API 호출
 def create_record(jwt, repo, collection, record):
     # JWT 토큰을 사용하여 게시물을 생성하는 API 호출
-    res = requests.post(
-        "https://bsky.social/xrpc/com.atproto.repo.createRecord",
-        headers={
-            "Authorization": f"Bearer {jwt}", # 인증을 위한 JWT 토큰
-            "Content-Type": "application/json"
-        },
-        json={
-            "repo": repo, # 게시물의 레포지토리
-            "collection": collection, # 게시물이 속할 컬렉션
-            "record": record # 게시물 내용
-        }
-    )
-    res.raise_for_status() # 오류 발생 시 예외를 발생시킴
-    return res.json() # 생성된 게시물에 대한 응답 반환
+    try:
+        print(f"[DEBUG] create_record() 호출됨. record: {json.dumps(record, ensure_ascii=False)}")
+        res = requests.post(
+            "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+            headers={
+                "Authorization": f"Bearer {jwt}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "repo": repo,
+                "collection": collection,
+                "record": record
+            }
+        )
+        res.raise_for_status()
+        return res.json()
+    except requests.exceptions.HTTPError as e:
+        print(f"[ERROR] create_record() 실패: {e}")
+        print(f"[ERROR] 요청 본문: {json.dumps(record, ensure_ascii=False)}")
+        raise
 
 # 이미지를 JPEG 형식으로 압축하고 1MB 이하로 용량 조정. 
 # 해상도가 너무 클 경우 4096x4096 이내로 축소함.
@@ -90,15 +116,387 @@ def upload_blob(jwt, image_bytes, mime_type="image/jpeg"):
     res.raise_for_status() # 오류 발생 시 예외를 발생시킴
     return res.json()["blob"] # 업로드된 이미지의 blob 참조 반환
 
-# quotes 폴더에서 랜덤한 .txt 파일을 선택하고 제목과 내용을 반환
-def load_random_work(quotes_dir="./quotes"):
-    print(f"[DEBUG] 랜덤 텍스트 로드 시도 - 폴더: {quotes_dir}")
-    files = [f for f in os.listdir(quotes_dir) if f.endswith(".txt")] # .txt 파일만 선택
+
+# 잔처리 함수
+def normalize_text(text):
+    text = re.sub(r"@[\w\.\-]+", "", text)
+    text = text.replace("：", ":")
+    text = re.sub(r"[^\w\s가-힣]", "", text)
+    words = text.lower().strip().split()
+    words = [strip_josa(w) for w in words]
+    return " ".join(words)
+
+# 조사 제거 함수 - 질문이나 뭐 출력해달라고 할 때 키워드를 확실히 인식되게끔 함.
+def strip_josa(word):
+    josa_list = ['은', '는', '이', '가', '을', '를', '에', '에서', '에게', '한테', '보다', '도', '만', '까지', '부터', '로', '으로', '와', '과', '랑', '이나', '나']
+    for josa in sorted(josa_list, key=len, reverse=True):  # 긴 조사 먼저
+        if word.endswith(josa):
+            return word[:-len(josa)]
+    return word
+
+
+POSTS_DIR = "./quotes/posts"
+REPLIES_DIR = "./quotes/replies"
+REPLY_IMAGES_DIR = "./quotes/reply_images"
+REPLY_QUESTION_DIR = "./quotes/reply_questions"
+
+# 자동 포스트용 텍스트 로딩 (quotes/posts/)
+def load_random_work():
+    print(f"[DEBUG] 랜덤 텍스트 로드 시도 - 폴더: {POSTS_DIR}")
+    files = [f for f in os.listdir(POSTS_DIR) if f.endswith(".txt")]
     if not files:
-        return None, None # 파일이 없으면 None 반환
-    chosen_file = random.choice(files) # 랜덤으로 파일 선택
-    with open(os.path.join(quotes_dir, chosen_file), encoding="utf-8") as f:
-        return chosen_file.replace(".txt", ""), f.read() # 제목과 내용을 반환
+        return None, None
+    chosen_file = random.choice(files)
+    with open(os.path.join(POSTS_DIR, chosen_file), encoding="utf-8") as f:
+        return chosen_file.replace(".txt", ""), f.read()
+
+# 자동 멘션 텍스트 응답 로딩 (quotes/replies/)
+def load_random_reply_chunk():
+    print(f"[DEBUG] 랜덤 답변 텍스트 청크 로드 시도 - 폴더: {REPLIES_DIR}")
+    files = [f for f in os.listdir(REPLIES_DIR) if f.endswith(".txt")]
+    print(f"[DEBUG] 텍스트 파일 목록: {files}")
+
+    if not files:
+        print("[WARNING] 텍스트 응답용 파일 없음")
+        return None
+
+    chosen_file = random.choice(files)
+    with open(os.path.join(REPLIES_DIR, chosen_file), encoding="utf-8") as f:
+        content = f.read()
+
+    # 본문만 추출 (--- 구분선 기준)
+    parts = content.split('---')
+    if len(parts) < 2:
+        print("[WARNING] --- 구분선이 없어 본문만 사용")
+        main_text = content
+    else:
+        main_text = parts[1].strip()  # 본문만 추출
+
+    chunks = split_into_chunks(main_text)
+    print(f"[DEBUG] 총 {len(chunks)}개 청크 추출됨")
+
+    if not chunks:
+        print(f"[WARNING] 청크 없음 (파일 이름: {chosen_file})")
+        return None
+
+    selected = random.choice(chunks)
+    print(f"[DEBUG] 선택된 청크: {selected[:50]}...")
+    return selected
+
+# 자동 멘션 이미지 응답 로딩 (quotes/reply_images/)
+def load_random_reply_image():
+    print(f"[DEBUG] 랜덤 답변 이미지 로드 시도 - 폴더: {REPLY_IMAGES_DIR}")
+    image_exts = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+    files = [f for f in os.listdir(REPLY_IMAGES_DIR) if f.lower().endswith(image_exts)]
+    if not files:
+        return None
+    return os.path.join(REPLY_IMAGES_DIR, random.choice(files))
+
+# 자동 멘션 질문 응답 로딩 (quotes/reply_images/)
+def question_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt, did):
+    print(f"[DEBUG] question_mention() 호출됨 - 원본 텍스트: '{mention_text}'")
+    mention_text = normalize_text(mention_text)
+    mention_words = [strip_josa(w) for w in mention_text.split()]
+    matched_filename = None
+    print(f"[DEBUG] 정규화된 텍스트: '{mention_text}'")
+
+    QUESTION_RULES =  OrderedDict([
+        (("웡우오", "웡×우오즈미", "웡x우오즈미", "웡우오즈미"), "04. wonguo.txt"),
+        (("우오즈미 테츠", "우오즈미"), "03. uozumi tetsu.txt"),
+        (("웡 웨이", "웡"), "02. wong wei.txt"),
+        (("오메르타", "오메르타 ~침묵의 규율~", "오메르타 code:tycoon", "오메르타 침묵", "오메르타 ct"), "01. omerta series.txt"),
+    ])
+
+    for keywords, filename in QUESTION_RULES.items():
+        for word in mention_words:
+            for kw in keywords:
+                if any(kw == word or kw in word for word in mention_words for kw in keywords):
+                    matched_filename = filename
+                    print(f"[DEBUG] 키워드 매칭 성공: '{kw}' == '{word}' or in '{word}' → {filename}")
+                    break
+            if matched_filename:
+                break
+        if matched_filename:
+            break
+
+    if not matched_filename:
+        print("[DEBUG] 질문 키워드 매칭 실패")
+        return "질문 내용이 명확하지 않아 응답할 수 없습니다."
+
+    file_path = os.path.join(REPLY_QUESTION_DIR, matched_filename)
+
+    # 디버깅: 현재 경로와 폴더 내용 출력
+    print(f"[DEBUG] 현재 작업 디렉토리: {os.getcwd()}")
+    print(f"[DEBUG] 응답 파일 경로 확인: {file_path}")
+    print(f"[DEBUG] reply_questions 안의 실제 파일 목록:")
+    try:
+        print(os.listdir(REPLY_QUESTION_DIR))
+    except Exception as e:
+        print(f"[ERROR] REPLY_QUESTION_DIR 접근 실패: {e}")
+
+    if not os.path.isfile(file_path):
+        print(f"[WARNING] 질문 응답용 파일 없음: {file_path}")
+        return "해당 주제에 대한 응답 파일이 없습니다."
+
+    with open(file_path, encoding="utf-8") as f:
+        content = f.read().strip()
+
+    if not content:
+        print(f"[WARNING] 질문 파일 내용 비어 있음: {matched_filename}")
+        return "내용이 비어 있어 응답할 수 없습니다."
+
+    print(f"[DEBUG] 질문 응답 본문: {content[:50]}...")
+    return content
+
+
+# 자동 멘션 텍스트 응답 로딩
+def handle_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt, did):
+    print(f"[DEBUG] 멘션 처리 시작: '{mention_text}'")
+
+    # NG 키워드 체크
+    ng_message, ng_keyword = check_ng_category(mention_text)
+    if ng_message:
+        print(f"[INFO] NG 키워드 감지됨: '{ng_keyword}' → 거절 메시지 전송")
+        post = {
+            "$type": "app.bsky.feed.post",
+            "text": ng_message,
+            "createdAt": now_timestamp(),
+            "langs": ["ko"],
+            "reply": {
+                "root": {"cid": root_cid, "uri": root_uri},
+                "parent": {"cid": parent_cid, "uri": parent_uri}
+            }
+        }
+        create_record(jwt, did, "app.bsky.feed.post", post)
+        return
+
+    # 자동 응답 분기
+    req_type = classify_request(mention_text)
+    print(f"[DEBUG] classify_request 결과: {req_type}") 
+    if req_type == "reply_text":
+        print("[DEBUG] reply_text 분기 진입")
+        reply_text = load_random_reply_chunk()
+        if reply_text:
+            print(f"[DEBUG] 응답할 텍스트: {reply_text[:50]}...")
+            post = {
+                "$type": "app.bsky.feed.post",
+                "text": reply_text,
+                "createdAt": now_timestamp(),
+                "langs": ["ko"],
+                "reply": {
+                    "root": {"cid": root_cid, "uri": root_uri},
+                    "parent": {"cid": parent_cid, "uri": parent_uri}
+                }
+            }
+            try:
+                create_record(jwt, did, "app.bsky.feed.post", post)
+                print("[DEBUG] 텍스트 포스트 전송 성공")
+            except Exception as e:
+                print(f"[ERROR] 텍스트 포스트 전송 실패: {e}")
+        else:
+            # fallback 응답
+            post = {
+                "$type": "app.bsky.feed.post",
+                "text": "⚠️ 텍스트 응답이 현재 준비되어 있지 않습니다. 나중에 다시 시도해주세요.",
+                "createdAt": now_timestamp(),
+                "langs": ["ko"],
+                "reply": {
+                    "root": {"cid": root_cid, "uri": root_uri},
+                    "parent": {"cid": parent_cid, "uri": parent_uri}
+                }
+            }
+            create_record(jwt, did, "app.bsky.feed.post", post)
+            print("[WARNING] 텍스트 응답 실패 - fallback 메시지 전송 완료")
+
+    elif req_type == "reply_image":
+        image_path = load_random_reply_image()
+        if image_path and os.path.exists(image_path):
+            try:
+                image_bytes, mime = compress_image(image_path)
+                blob = upload_blob(jwt, image_bytes, mime)
+                post = {
+                    "$type": "app.bsky.feed.post",
+                    "text": "📷 요청하신 이미지를 첨부합니다.",
+                    "createdAt": now_timestamp(),
+                    "langs": ["ko"],
+                    "embed": {
+                        "$type": "app.bsky.embed.images",
+                        "images": [{
+                            "alt": os.path.basename(image_path),
+                            "image": blob
+                        }]
+                    },
+                    "reply": {
+                        "root": {"cid": root_cid, "uri": root_uri},
+                        "parent": {"cid": parent_cid, "uri": parent_uri}
+                    }
+                }
+                create_record(jwt, did, "app.bsky.feed.post", post)
+            except Exception as e:
+                print(f"[ERROR] 이미지 응답 실패: {e}")
+
+    elif req_type == "reply_question":
+        reply_text = question_mention(mention_text, root_cid, root_uri, parent_cid, parent_uri, jwt, did)
+        if reply_text and "응답할 수 없습니다" not in reply_text:
+            post = {
+                "$type": "app.bsky.feed.post",
+                "text": reply_text,
+                "createdAt": now_timestamp(),
+                "langs": ["ko"],
+                "reply": {
+                    "root": {"cid": root_cid, "uri": root_uri},
+                    "parent": {"cid": parent_cid, "uri": parent_uri}
+                }
+            }
+            create_record(jwt, did, "app.bsky.feed.post", post)
+
+    elif req_type == "ambiguous":
+        post = {
+            "$type": "app.bsky.feed.post",
+            "text": "⚠️ 텍스트와 이미지 요청이 동시에 감지되었습니다. 한 번에 하나씩 요청해주세요.",
+            "createdAt": now_timestamp(),
+            "langs": ["ko"],
+            "reply": {
+                "root": {"cid": root_cid, "uri": root_uri},
+                "parent": {"cid": parent_cid, "uri": parent_uri}
+            }
+        }
+        create_record(jwt, did, "app.bsky.feed.post", post)
+
+# 블랙리스트 해제 멘션을 보내면 해당 계정은 블랙리스트에서 제거됨.
+OWNER_DID = os.environ.get("BLUESKY_DID")
+
+def remove_from_ignored_dids(target_did):
+    if not os.path.exists(IGNORED_DID_FILE):
+        return
+    with open(IGNORED_DID_FILE, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip() and line.strip() != target_did]
+    with open(IGNORED_DID_FILE, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+# 하루에 질문 10회 제한
+MENTION_COUNT_FILE = "/tmp/mention_counts.json"
+
+def track_mention_count(did):
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    data = {}
+    if os.path.exists(MENTION_COUNT_FILE):
+        with open(MENTION_COUNT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+    if today not in data:
+        data[today] = {}
+
+    data[today][did] = data[today].get(did, 0) + 1
+
+    with open(MENTION_COUNT_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    return data[today][did]
+
+# /tmp/mention_text_history.json 파일을 기반으로 오늘 같은 멘션을 이미 처리했는지 확인
+MENTION_TEXT_HISTORY_FILE = "/tmp/mention_text_history.json"
+
+def is_duplicate_mention_text(did, text):
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    data = {}
+    if os.path.exists(MENTION_TEXT_HISTORY_FILE):
+        with open(MENTION_TEXT_HISTORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+    if today not in data:
+        data[today] = {}
+
+    if did in data[today] and text.strip() in data[today][did]:
+        return True  # 이미 동일한 텍스트가 처리됨
+
+    # 새 텍스트 추가
+    data[today].setdefault(did, []).append(text.strip())
+    with open(MENTION_TEXT_HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    return False
+
+# 자동 맨션 기능
+def process_mentions(auth):
+    print("[DEBUG] Mentions 처리 시작")
+
+    jwt = auth["accessJwt"]
+    did = auth["did"]
+
+    res = requests.get(
+        "https://bsky.social/xrpc/app.bsky.notification.listNotifications",
+        headers={"Authorization": f"Bearer {jwt}"},
+        params={"limit": 50}
+    )
+    res.raise_for_status()
+    notifications = res.json().get("notifications", [])
+
+    for notif in notifications:
+        print(f"[DEBUG] 알림 reason: {notif.get('reason')} | CID: {notif.get('cid')}")
+        if notif.get("reason") != "mention":
+            continue
+
+        cid = notif["cid"]
+        if is_already_processed(cid):
+            print(f"[INFO] 이미 처리된 멘션: {cid}")
+            continue
+
+        author = notif["author"]
+        author_did = author["did"]
+        uri = notif["uri"]
+        text = notif.get("record", {}).get("text", "")
+
+        if is_duplicate_mention_text(author_did, text):
+            print(f"[INFO] 동일한 멘션 텍스트 반복 감지됨 → 무시: {text[:30]}...")
+            mark_cid_processed(cid)
+            continue
+
+        if is_ignored_did(author_did):
+            print(f"[INFO] 무시된 DID: {author_did}")
+            mark_cid_processed(cid)
+            continue
+
+        ng_msg, ng_kw = check_ng_category(text)
+        if ng_msg:
+            log_ng_mention(cid, author_did, ng_kw, ng_msg, text)
+            add_to_ignored_dids([author_did])
+            handle_mention(text, cid, uri, cid, uri, jwt, did)
+            mark_cid_processed(cid)
+            continue
+
+        if author_did == OWNER_DID and "블랙리스트 해제" in text:
+            # 해제할 대상 추출 (예: "@wonguobot 블랙리스트 해제 @did:plc:xxxx")
+                match = re.search(r"@([a-zA-Z0-9_.:-]+)", text)
+                if match:
+                    target_did = match.group(1)
+                    remove_from_ignored_dids(target_did)
+                    print(f"[INFO] 블랙리스트 해제됨: {target_did}")
+
+                    # 블랙리스트 해제 알림 멘션도 여기서 함께 처리
+                    if jwt and did:
+                        post = {
+                            "$type": "app.bsky.feed.post",
+                            "text": f"✅ @{target_did} 블랙리스트에서 해제되었습니다.",
+                            "createdAt": now_timestamp(),
+                            "langs": ["ko"]
+                        }
+                        create_record(jwt, did, "app.bsky.feed.post", post)
+                else:
+                    print("[WARNING] 블랙리스트 해제 명령어는 있지만 대상 DID를 찾지 못함.")
+                create_record(jwt, did, "app.bsky.feed.post", post)
+
+        count = track_mention_count(author_did)
+        if count > 10:
+            print(f"[INFO] {author_did} - 하루 멘션 {count}회 초과 → 무시 목록 등록")
+            add_to_ignored_dids([author_did])
+            mark_cid_processed(cid)
+            continue
+
+        log_mention(cid, author_did, text)
+        handle_mention(text, cid, uri, cid, uri, jwt, did)
+        mark_cid_processed(cid)
+        print(f"[DEBUG] 멘션 응답 완료: {cid} ({author['handle']})")
 
 # 텍스트에서 이미지 파일명을 추출하여 텍스트/이미지 블록으로 분리
 def split_lines_with_images(text):
@@ -141,69 +539,193 @@ def split_into_chunks(text, max_length=300):
 
 # 이 줄부터 메인 실행 함수 - 텍스트 로드, 이미지 업로드, 게시물 생성까지 전체 수행
 
+# 블루스카이 핸들 하이퍼링크 감지 기능 (+ DID 자동 변환)
+def resolve_handle_to_did(handle):
+    try:
+        res = requests.get(
+            "https://bsky.social/xrpc/com.atproto.identity.resolveHandle",
+            params={"handle": handle}
+        )
+        res.raise_for_status()
+        print(f"[DEBUG] 알림 수신됨: {len(notifications)}건")
+        return res.json()["did"]
+    except Exception as e:
+        print(f"[ERROR] DID resolve 실패: {handle} ({e})")
+        return None
+
 # URL을 감지하여 Bluesky API에서 하이퍼링크 미리보기(facets)를 붙일 수 있도록 구조화된 리스트로 반환
 def extract_facets(text):
-    text = re.sub(r'[\u00A0\u2000-\u200B\u202F\u205F\u3000]', ' ', text) # 다양한 종류의 유니코드 공백 문자들을 일반 공백(' ')으로 통일
-    text = text.replace('：', ':') # 전각 콜론(：)을 일반 콜론(:)으로 바꿔서 URL 인식에 방해되지 않도록 처리
+    print("[DEBUG] extract_facets 시작")
     facets = []
-    pattern = r'(https?://[^\s\)\]\}\<\>\"\']+)' # URL 패턴 정의: 괄호나 따옴표 등의 문자로 끝나지 않는 http/https 링크를 감지
+    text = re.sub(r'[\u00A0\u2000-\u200B\u202F\u205F\u3000]', ' ', text)
+    text = text.replace('：', ':')
 
-    # 텍스트 내에서 패턴과 일치하는 URL을 반복적으로 찾아냄
-    for match in re.finditer(pattern, text):
-        start, end = match.start(), match.end()
+    # URL 감지
+    print("[DEBUG] URL 패턴 검사 시작")
+    url_pattern = r'(https?://[^\s\)\]\}\<\>\"\']+)'
+    for match in re.finditer(url_pattern, text):
         url = match.group(0)
-
-        # Bluesky facets는 byte 위치를 요구하므로, UTF-8 기준으로 byte offset 계산
-        byte_start = len(text[:start].encode('utf-8'))
-        byte_end = len(text[:end].encode('utf-8'))
+        byte_start = len(text[:match.start()].encode("utf-8"))
+        byte_end = len(text[:match.end()].encode("utf-8"))
+        facets.append({
+            "index": {"byteStart": byte_start, "byteEnd": byte_end},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": url}]
+        })
         print(f"[DEBUG] URL 감지됨: {url} (byteStart={byte_start}, byteEnd={byte_end})")
 
-        # Bluesky에서 링크를 facets로 인식하게 만들기 위한 구조
+    # 핸들 감지 및 DID 자동 변환
+    print("[DEBUG] 핸들 패턴 검사 시작")
+    mention_pattern = r'@([a-zA-Z0-9_.-]+\.bsky\.social)'
+    for match in re.finditer(mention_pattern, text):
+        handle = match.group(1)
+        did = resolve_handle_to_did(handle)
+        if not did:
+            print(f"[WARNING] DID resolve 실패: {handle}")
+            continue
+        byte_start = len(text[:match.start()].encode("utf-8"))
+        byte_end = len(text[:match.end()].encode("utf-8"))
         facets.append({
-            "index": {
-                "byteStart": byte_start,
-                "byteEnd": byte_end
-            },
-            "features": [
-                {
-                    "$type": "app.bsky.richtext.facet#link", # 링크 타입 지정
-                    "uri": url # 감지된 URL
-                }
-            ]
+            "index": {"byteStart": byte_start, "byteEnd": byte_end},
+            "features": [{
+                "$type": "app.bsky.richtext.facet#mention",
+                "did": did
+            }]
         })
+        print(f"[DEBUG] 멘션 감지됨: @{handle} (DID: {did}, byteStart={byte_start}, byteEnd={byte_end})")
+
     if facets:
         print(f"[DEBUG] 총 facets 생성됨: {len(facets)}개")
     else:
-        print("[DEBUG] facets 없음 (URL 미감지)")
-    return facets # URL 정보를 포함한 facets 리스트 반환
+        print("[DEBUG] facets 없음 (URL/멘션 미감지)")
+    return facets
 
-def main():
+
+# 2. 자동 멘션 응답 키워드 분기
+def classify_request(text):
+    original_text = text  # 원본 보존
+    text = normalize_text(text)
+
+    print(f"[DEBUG] normalize_text 결과: '{text}'") 
+
+    image_keywords = ["이미지", "그림", "사진"]
+    text_keywords = ["스크립트", "ss", "텍스트"]
+    question_keywords  = [
+    "질문", "궁금", "알려줘", "알려", "뭐야", "무엇", "뭐지",
+    "말해줘", "말해봐", "말해", "소개해줘", "소개", "얘기해줘", "얘기해", "이야기해줘", "이야기해"
+    ]
+
+    has_image_kw = any(k in text for k in image_keywords)
+    has_text_kw = any(k in text for k in text_keywords)
+    has_question_kw = any(k in text for k in question_keywords)
+
+    print(f"[DEBUG] classify_request() 원본: '{original_text}' → 정규화: '{text}'")
+    print(f"[DEBUG] 키워드 포함 여부 → image: {has_image_kw}, text: {has_text_kw}, question: {has_question_kw}")
+
+    matched = sum([has_image_kw, has_text_kw, has_question_kw])
+    if matched >= 2:
+        return "ambiguous"
+    elif has_image_kw:
+        return "reply_image"
+    elif has_text_kw:
+        return "reply_text"
+    elif has_question_kw:
+        return "reply_question"
+    else:
+        print("[DEBUG] 키워드 미감지 → 자동 응답 없음")
+        return None
+
+
+# 3. NG 키워드 감지 + 카테고리별 거절 + 블랙리스트 등록
+# 커스텀이 가능합니다. 
+NG_RULES = {
+    "비공식 커플링 주제": {
+        "keywords": ["우가진×우오즈미", "우가진×웡", "우가우오", "우가웡", 
+                     "JJ×우오즈미", "J우오즈미", "웡×JJ", "웡J",
+                     "류×우오즈미", "류우오", "류×웡", "류웡" 
+                     "비공식 CP", "비공식 커플링", "비공컾"],
+        "messages": ["봇주는 오메르타 시리즈의 비공식 커플링 관련 주제를 거부하고 있습니다."]
+    },
+    "비속어 및 취향 비하": {
+        "keywords": ["병신", "등신", "지랄", "좆", "이딴", "쓰레기", "씨발", "니미", "한남", "한녀", "한남충", "김치녀", 
+                     "남미새", "여미새", "역겹", "토나와", 
+                     "두창", "똥꼬충", "이딴 거", "왜 좋아해?", "왜 좋아하냐?"],
+        "messages": [
+            "저속한 표현은 삼가바랍니다.",
+            "타인의 취향을 존중할 줄 아는 오타쿠가 되시길 바랍니다.",
+            "불편하시면 뮤트나 차단 기능을 활용해주세요."
+        ]
+    },
+
+    "다른 카린 게임 작품": {
+        "keywords": ["단죄의 마리아", "오메가 뱀파이어", "절대미궁그림", "절대미궁", 
+                     "절대미궁 비밀의 엄지공주", "프린세스 나이트메어", "아니마 문디"],
+        "messages": ["본 봇은 오메르타 시리즈의 서브 커플링 웡우오 전용 팬봇입니다. 즉 카린 작품 통합 봇이 아닙니다."]
+    }
+}
+
+IGNORED_DID_FILE = "/tmp/ignored_dids.txt"
+
+def check_ng_category(text):
+    for category, rule in NG_RULES.items():
+        for kw in rule["keywords"]:
+            if kw in text:
+                return random.choice(rule["messages"]), kw
+    return None, None
+
+
+def log_ng_mention(cid, author_did, keyword, message, text):
+    with open("/tmp/ng_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.utcnow().isoformat()}Z] CID: {cid} | Author: {author_did}\n")
+        f.write(f"Keyword: '{keyword}' | Message: '{message}'\n")
+        f.write(f"Text: {text}\n\n")
+
+def log_mention(cid, author_did, text):
+    # 중복 멘션 텍스트 기록도 함께 처리
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    data = {}
+    if os.path.exists(MENTION_TEXT_HISTORY_FILE):
+        with open(MENTION_TEXT_HISTORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    if today not in data:
+        data[today] = {}
+    data[today].setdefault(author_did, []).append(text.strip())
+    with open(MENTION_TEXT_HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    # 멘션 로그 작성
+    with open("/tmp/mention_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.utcnow().isoformat()}Z] CID: {cid} | Author: {author_did}\n")
+        f.write(f"Text: {text}\n\n")
+
+# 이미 처리한 멘션이면 skip
+PROCESSED_CID_FILE = "/tmp/processed_cids.txt"
+
+def is_already_processed(cid):
+    if not os.path.exists(PROCESSED_CID_FILE):
+        return False
+    with open(PROCESSED_CID_FILE, "r", encoding="utf-8") as f:
+        return cid in [line.strip() for line in f if line.strip()]
+
+def mark_cid_processed(cid):
+    with open(PROCESSED_CID_FILE, "a", encoding="utf-8") as f:
+        f.write(cid + "\n")
+
+
+def main(auth):
     print("[DEBUG] 메인 함수 시작")
-    quotes_dir = "./quotes"
-    work_title, content = load_random_work(quotes_dir) # 랜덤 텍스트 로드
+    work_title, content = load_random_work()
     if not content:
-        return {"status": "error", "message": "No content loaded"} # 내용이 없으면 오류 반환
+        return {"status": "error", "message": "No content loaded"}
 
-    parts = content.split('---') # 내용 분리 (헤드, 본문, 클로징)
+    parts = content.split('---')
     head_text = parts[0].strip() if len(parts) >= 1 else ""
     body = parts[1].strip() if len(parts) >= 2 else ""
     closing = parts[2].strip() if len(parts) == 3 else ""
 
-    blocks = split_lines_with_images(body) # 본문에서 이미지 블록 분리
+    blocks = split_lines_with_images(body)
 
-    handle = "userID.bsky.social"
-    app_password = os.environ.get("BLUESKY_APP_PASSWORD") # 환경변수에서 비밀번호 가져오기
-    if not app_password:
-        return {"status": "error", "message": "Missing app password"} # 비밀번호 없으면 오류 반환
-
-    auth = bluesky_login(handle, app_password) # Bluesky 로그인
-    print("[DEBUG] 로그인 성공, DID:", auth["did"])
     jwt = auth["accessJwt"]
     did = auth["did"]
-
-    parent = None # 부모 포스트 초기화
-    root = None # 루트 포스트 초기화
-    prev_text = None # 이전 텍스트 저장 변수 초기화
 
     if head_text:
         print("[DEBUG] 서두 텍스트 존재. 첫 포스트 생성.")
@@ -213,7 +735,7 @@ def main():
             "createdAt": now_timestamp(),
             "langs": ["ko"]
         }
-        root = parent = create_record(jwt, repo=did, collection="app.bsky.feed.post", record=post) # 첫 포스트 생성
+        root = parent = create_record(jwt, repo=did, collection="app.bsky.feed.post", record=post)
 
     # 본문 블록 처리
     for block in blocks:
@@ -251,7 +773,7 @@ def main():
                 prev_text = chunk # 텍스트가 처리될 때 prev_text 갱신
 
         elif block["type"] == "image":
-            image_path = os.path.join(quotes_dir, block["filename"]) # 이미지 파일 경로
+            image_path = os.path.join(POSTS_DIR, block["filename"]) # 이미지 파일 경로
             if os.path.exists(image_path):
                 try:
                     print(f"[DEBUG] 이미지 파일 존재: {image_path}")
@@ -316,4 +838,30 @@ def main():
 # AWS Lambda에서 진입점 역할을 하는 핸들러 함수
 def lambda_handler(event, context):
     print("[DEBUG] Lambda 핸들러 실행 시작")
-    return main() # 메인 함수 실행
+    try:
+        auth = bluesky_login()
+
+        # CloudWatch Events로부터 받은 이벤트 타입에 따라 처리 분기
+        if "source" in event and event["source"] == "aws.events":
+            # EventBridge에서 스케줄 트리거
+            if "detail-type" in event:
+                schedule_type = event["detail-type"]
+                if schedule_type == "Scheduled Event":
+                    # 이벤트 이름에 따라 분기
+                    rule_name = event.get("resources", [""])[0]
+                    if "mention" in rule_name.lower():
+                        print("[DEBUG] 멘션 자동응답 분기 진입")
+                        process_mentions(auth)
+                    else:
+                        print("[DEBUG] 자동 포스트 분기 진입")
+                        return main(auth)
+        else:
+            # 수동 실행 등 기타 상황 → 기본은 자동 포스트
+            return main(auth)
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        print(f"[ERROR] Lambda 전체 처리 중 오류: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
