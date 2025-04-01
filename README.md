@@ -21,6 +21,8 @@ The English translation page (using ChatGPT) is [here](https://github.com/sechsK
 - **하이퍼 링크(URL) 구현**  
   블루스카이의 API와 연동해 facets를 가져와 텍스트에 URL 주소를 기재하면 자동으로 하이퍼 링크를 만듭니다.
 
+  - **질문, 요청 시 맞는 답을 되돌려주는 자동 멘션 기능**  
+  특정 키워드가 들어간 질문이나 요청을 할 시 quotes 폴더에 연동된 데이터를 호출해 답변을 전해줍니다. 
 
 ## 필요 사항
 - **언어**: Python  
